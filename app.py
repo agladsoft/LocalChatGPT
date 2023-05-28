@@ -51,8 +51,8 @@ LOADER_MAPPING = {
 }
 
 
-repo_name = "IlyaGusev/saiga_7b_lora_llamacpp"
-model_name = "ggml-model-q8_0.bin"
+repo_name = "IlyaGusev/saiga_13b_lora_llamacpp"
+model_name = "ggml-model-q4_1.bin"
 embedder_name = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
 
 snapshot_download(repo_id=repo_name, local_dir=".", allow_patterns=model_name)
