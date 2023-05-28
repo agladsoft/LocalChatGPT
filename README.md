@@ -1,5 +1,5 @@
 ---
-title: Saiga 7b Retrieval Qa
+title: Saiga 7b llama.cpp Retrieval QA
 emoji: 🚀
 colorFrom: pink
 colorTo: pink
@@ -8,5 +8,3 @@ sdk_version: 3.32.0
 app_file: app.py
 pinned: false
 ---
-
-Check out the configuration reference at https://huggingface.co/docs/hub/spaces-config-reference

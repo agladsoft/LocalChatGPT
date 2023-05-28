@@ -51,28 +51,20 @@ LOADER_MAPPING = {
 }
 
 
-MODEL_NAME = "ggml-model-q4_1.bin"
-snapshot_download(
-    repo_id="IlyaGusev/saiga_7b_lora_llamacpp",
-    local_dir=".",
-    allow_patterns=MODEL_NAME
-)
+repo_name = "IlyaGusev/saiga_7b_lora_llamacpp"
+model_name = "ggml-model-q8_0.bin"
+embedder_name = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
 
+snapshot_download(repo_id=repo_name, local_dir=".", allow_patterns=model_name)
 
 model = Llama(
-    model_path=MODEL_NAME,
+    model_path=model_name,
     n_ctx=2000,
     n_parts=1,
 )
 
 max_new_tokens = 1500
-top_k = 30
-top_p = 0.9
-temp = 0.1
-repeat_penalty = 1.15
-chunk_size = 300
-
-embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/paraphrase-multilingual-mpnet-base-v2")
+embeddings = HuggingFaceEmbeddings(model_name=embedder_name)
 
 def get_uuid():
     return str(uuid4())
@@ -104,29 +96,35 @@ def upload_files(files, file_paths):
     return file_paths
 
 
-def build_index(file_paths, db):
+def process_text(text):
+    lines = text.split("\n")
+    lines = [line for line in lines if len(line.strip()) > 2]
+    text = "\n".join(lines).strip()
+    if len(text) < 10:
+        return None
+    return text
+
+
+def build_index(file_paths, db, chunk_size, chunk_overlap, file_warning):
     documents = [load_single_document(path) for path in file_paths]
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=20)
-    texts = text_splitter.split_documents(documents)
-    def fix_lines(text):
-        lines = text.split("\n")
-        lines = [line for line in lines if len(line.strip()) > 2]
-        return "\n".join(lines)
-    fixed_texts = []
-    for text in texts:
-        text.page_content = fix_lines(text.page_content)
-        if len(text.page_content) < 10:
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+    documents = text_splitter.split_documents(documents)
+    fixed_documents = []
+    for doc in documents:
+        doc.page_content = process_text(doc.page_content)
+        if not doc.page_content:
             continue
-        fixed_texts.append(text)
+        fixed_documents.append(doc)
 
     db = Chroma.from_documents(
-        fixed_texts,
+        fixed_documents,
         embeddings,
         client_settings=Settings(
             anonymized_telemetry=False
         )
     )
-    return db
+    file_warning = f"Загружен {len(fixed_documents)} фрагментов! Можно задавать вопросы."
+    return db, file_warning
 
 
 def user(message, history, system_prompt):
@@ -134,7 +132,25 @@ def user(message, history, system_prompt):
     return "", new_history
 
 
-def bot(history, system_prompt, conversation_id, db):
+def retrieve(history, db, retrieved_docs, k_documents):
+    context = ""
+    if db:
+        last_user_message = history[-1][0]
+        retriever = db.as_retriever(search_kwargs={"k": k_documents})
+        docs = retriever.get_relevant_documents(last_user_message)
+        retrieved_docs = "\n\n".join([doc.page_content for doc in docs])
+    return retrieved_docs
+
+
+def bot(
+    history,
+    system_prompt,
+    conversation_id,
+    retrieved_docs,
+    top_p,
+    top_k,
+    temp
+):
     if not history:
         return
 
@@ -149,11 +165,8 @@ def bot(history, system_prompt, conversation_id, db):
             tokens.extend(message_tokens)
 
     last_user_message = history[-1][0]
-    if db:
-        retriever = db.as_retriever(search_kwargs={"k": 2})
-        docs = retriever.get_relevant_documents(last_user_message)
-        context = "\n\n".join([doc.page_content for doc in docs])
-        last_user_message = f"Контекст: {context}\n\nИспользуя контекст, ответь на вопрос: {last_user_message}"
+    if retrieved_docs:
+        last_user_message = f"Контекст: {retrieved_docs}\n\nИспользуя контекст, ответь на вопрос: {last_user_message}"
     message_tokens = get_message_tokens(model=model, role="user", content=last_user_message)
     tokens.extend(message_tokens)
 
@@ -163,17 +176,14 @@ def bot(history, system_prompt, conversation_id, db):
         tokens,
         top_k=top_k,
         top_p=top_p,
-        temp=temp,
-        repeat_penalty=repeat_penalty
+        temp=temp
     )
 
-    completion_tokens = []
     partial_text = ""
     for i, token in enumerate(generator):
-        completion_tokens.append(token)
         if token == model.token_eos() or (max_new_tokens is not None and i >= max_new_tokens):
             break
-        partial_text = model.detokenize(completion_tokens).decode("utf-8", "ignore")
+        partial_text += model.detokenize([token]).decode("utf-8", "ignore")
         history[-1][1] = partial_text
         yield history
 
@@ -185,16 +195,83 @@ with gr.Blocks(
     conversation_id = gr.State(get_uuid)
     favicon = '<img src="https://cdn.midjourney.com/b88e5beb-6324-4820-8504-a1a37a9ba36d/0_1.png" width="48px" style="display: inline">'
     gr.Markdown(
-        f"""<h1><center>{favicon}Saiga 7B Retrieval QA Llama.cpp</center></h1>
+        f"""<h1><center>{favicon}Saiga 7B llama.cpp: retrieval QA</center></h1>
         """
     )
 
-    system_prompt = gr.Textbox(label="Системный промпт", placeholder="", value=SYSTEM_PROMPT)
+    with gr.Row():
+        with gr.Column(scale=5):
+            file_output = gr.File(file_count="multiple", label="Загрузка файлов")
+            file_paths = gr.State([])
+            file_warning = gr.Markdown(f"Фрагменты ещё не загружены!")
 
-    file_output = gr.File(file_count="multiple")
-    file_paths = gr.State([])
+        with gr.Column(min_width=200, scale=3):
+            with gr.Tab(label="Параметры нарезки"):
+                chunk_size = gr.Slider(
+                    minimum=50,
+                    maximum=2000,
+                    value=250,
+                    step=50,
+                    interactive=True,
+                    label="Размер фрагментов",
+                )
+                chunk_overlap = gr.Slider(
+                    minimum=0,
+                    maximum=500,
+                    value=30,
+                    step=10,
+                    interactive=True,
+                    label="Пересечение"
+                )
 
-    chatbot = gr.Chatbot().style(height=400)
+
+    with gr.Row():
+        k_documents = gr.Slider(
+            minimum=1,
+            maximum=10,
+            value=2,
+            step=1,
+            interactive=True,
+            label="Кол-во фрагментов для контекста"
+        )
+    with gr.Row():
+        retrieved_docs = gr.Textbox(
+            lines=6,
+            label="Извлеченные фрагменты",
+            placeholder="Появятся после задавания вопросов",
+            interactive=False
+        )
+    with gr.Row():
+        with gr.Column(scale=5):
+            system_prompt = gr.Textbox(label="Системный промпт", placeholder="", value=SYSTEM_PROMPT, interactive=False)
+            chatbot = gr.Chatbot(label="Диалог").style(height=400)
+        with gr.Column(min_width=80, scale=1):
+            with gr.Tab(label="Параметры генерации"):
+                top_p = gr.Slider(
+                    minimum=0.0,
+                    maximum=1.0,
+                    value=0.9,
+                    step=0.05,
+                    interactive=True,
+                    label="Top-p",
+                )
+                top_k = gr.Slider(
+                    minimum=10,
+                    maximum=100,
+                    value=30,
+                    step=5,
+                    interactive=True,
+                    label="Top-k",
+                )
+                temp = gr.Slider(
+                    minimum=0.0,
+                    maximum=2.0,
+                    value=0.1,
+                    step=0.1,
+                    interactive=True,
+                    label="Temp"
+                )
+
     with gr.Row():
         with gr.Column():
             msg = gr.Textbox(
@@ -208,41 +285,72 @@ with gr.Blocks(
                 stop = gr.Button("Остановить")
                 clear = gr.Button("Очистить")
 
+    # Upload files
     upload_event = file_output.change(
         fn=upload_files,
         inputs=[file_output, file_paths],
         outputs=[file_paths],
-        queue=False,
-    ).then(
+        queue=True,
+    ).success(
         fn=build_index,
-        inputs=[file_paths, db],
-        outputs=[db],
+        inputs=[file_paths, db, chunk_size, chunk_overlap, file_warning],
+        outputs=[db, file_warning],
         queue=True
     )
 
+    # Pressing Enter
     submit_event = msg.submit(
         fn=user,
         inputs=[msg, chatbot, system_prompt],
         outputs=[msg, chatbot],
         queue=False,
-    ).then(
+    ).success(
+        fn=retrieve,
+        inputs=[chatbot, db, retrieved_docs, k_documents],
+        outputs=[retrieved_docs],
+        queue=True,
+    ).success(
         fn=bot,
-        inputs=[chatbot, system_prompt, conversation_id, db],
+        inputs=[
+            chatbot,
+            system_prompt,
+            conversation_id,
+            retrieved_docs,
+            top_p,
+            top_k,
+            temp
+        ],
         outputs=chatbot,
         queue=True,
     )
 
+    # Pressing the button
     submit_click_event = submit.click(
         fn=user,
         inputs=[msg, chatbot, system_prompt],
         outputs=[msg, chatbot],
         queue=False,
-    ).then(
+    ).success(
+        fn=retrieve,
+        inputs=[chatbot, db, retrieved_docs, k_documents],
+        outputs=[retrieved_docs],
+        queue=True,
+    ).success(
         fn=bot,
-        inputs=[chatbot, system_prompt, conversation_id, db],
+        inputs=[
+            chatbot,
+            system_prompt,
+            conversation_id,
+            retrieved_docs,
+            top_p,
+            top_k,
+            temp
+        ],
         outputs=chatbot,
         queue=True,
     )
+
+    # Stop generation
     stop.click(
         fn=None,
         inputs=None,
@@ -250,7 +358,9 @@ with gr.Blocks(
         cancels=[submit_event, submit_click_event],
         queue=False,
     )
+
+    # Clear history
     clear.click(lambda: None, None, chatbot, queue=False)
 
 demo.queue(max_size=128, concurrency_count=1)
-demo.launch()
+demo.launch(share=True)
