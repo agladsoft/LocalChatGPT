@@ -195,7 +195,7 @@ with gr.Blocks(
     conversation_id = gr.State(get_uuid)
     favicon = '<img src="https://cdn.midjourney.com/b88e5beb-6324-4820-8504-a1a37a9ba36d/0_1.png" width="48px" style="display: inline">'
     gr.Markdown(
-        f"""<h1><center>{favicon}Saiga 7B llama.cpp: retrieval QA</center></h1>
+        f"""<h1><center>{favicon}Saiga 13B llama.cpp: retrieval QA</center></h1>
         """
     )
 
