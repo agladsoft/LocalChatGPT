@@ -1,5 +1,6 @@
 import gradio as gr
 
+from uuid import uuid4
 from huggingface_hub import snapshot_download
 from langchain.document_loaders import (
     CSVLoader,
@@ -72,6 +73,9 @@ repeat_penalty = 1.15
 chunk_size = 300
 
 embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/paraphrase-multilingual-mpnet-base-v2")
+
+def get_uuid():
+    return str(uuid4())
 
 
 def load_single_document(file_path: str) -> Document:
