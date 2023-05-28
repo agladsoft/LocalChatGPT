@@ -123,7 +123,7 @@ def build_index(file_paths, db, chunk_size, chunk_overlap, file_warning):
             anonymized_telemetry=False
         )
     )
-    file_warning = f"Загружен {len(fixed_documents)} фрагментов! Можно задавать вопросы."
+    file_warning = f"Загружено {len(fixed_documents)} фрагментов! Можно задавать вопросы."
     return db, file_warning
 
 
