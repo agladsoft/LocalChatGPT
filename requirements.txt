@@ -4,3 +4,4 @@ huggingface-hub==0.14.1
 chromadb==0.3.23
 pdfminer.six==20221105
 unstructured==0.6.10
+tabulate
