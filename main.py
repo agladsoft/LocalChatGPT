@@ -103,17 +103,6 @@ def process_text(text):
     return None if len(text) < 10 else text
 
 
-# def fetch_embeddings(collection_name):
-#     collection = chromadb_client.get_collection(
-#         name=collection_name, embedding_function=embeddings
-#     )
-#     embeddings = collection.get(include=["embeddings"])
-#
-#     print(collection.get(include=["embeddings", "documents", "metadatas"]))
-#
-#     return embeddings
-
-
 def build_index(file_paths, db, chunk_size, chunk_overlap, file_warning):
     documents = [load_single_document(path) for path in file_paths]
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
@@ -130,12 +119,6 @@ def build_index(file_paths, db, chunk_size, chunk_overlap, file_warning):
         for i in range(1, len(fixed_documents) + 1):
             ids.append(f"{path.split('/')[-1].replace('.txt', '')}{i}")
 
-    # for path in file_paths:
-    #     for key, value in db_cache.items():
-    #         if key == 'metadatas':
-    #             for source in value:
-    #                 if path.split('/')[-1] == source["source"].split('/')[-1]:
-    #                     print(path)
     if db:
         data = db.get()
         files_db = {dict_data['source'].split('/')[-1] for dict_data in data["metadatas"]}
@@ -143,10 +126,6 @@ def build_index(file_paths, db, chunk_size, chunk_overlap, file_warning):
         if files_load == files_db:
             db.update_documents(ids, fixed_documents)
             return db, file_warning
-        # for document, _id in zip(fixed_documents, ids):
-        #     for id_db in data["ids"]:
-        #         if id_db == _id:
-        #             db.update_documents(_id, document)
 
     db = Chroma.from_documents(
         documents=fixed_documents,
@@ -159,37 +138,6 @@ def build_index(file_paths, db, chunk_size, chunk_overlap, file_warning):
     )
     file_warning = f"Загружено {len(fixed_documents)} фрагментов! Можно задавать вопросы."
 
-    # db.update_document()
-
-    return db, file_warning
-
-
-def build_index2(file_paths, db, chunk_size, chunk_overlap, file_warning):
-    documents = [load_single_document(path) for path in file_paths]
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
-    documents = text_splitter.split_documents(documents)
-
-    # import chromadb
-    # client = chromadb.Client(Settings(persist_directory="db"))
-    # db = client.get_or_create_collection(name="all_documents")
-    #
-    # print(db.get())
-
-    for i, doc in enumerate(documents, 1):
-        db.add(ids=f"id{i}", metadatas=doc.metadata, documents=doc.page_content)
-
-    # print(db.get())
-
-    # db = Chroma.from_documents(
-    #     documents=documents,
-    #     embedding=embeddings,
-    #     collection_name="all_documents",
-    #     client_settings=Settings(
-    #         anonymized_telemetry=False,
-    #         persist_directory = "db"
-    #     )
-    # )
-    file_warning = f"Загружено {len(documents)} фрагментов! Можно задавать вопросы."
     return db, file_warning
 
 
@@ -201,11 +149,7 @@ def user(message, history, system_prompt):
 def retrieve(history, db, retrieved_docs, k_documents):
     if db:
         last_user_message = history[-1][0]
-        # retriever = db.as_retriever(search_kwargs={"k": k_documents})
-        # docs = retriever.get_relevant_documents(last_user_message)
-
         docs = db.similarity_search(last_user_message)
-
         source_docs = set()
         for doc in docs:
             for content in doc.metadata.values():
@@ -233,9 +177,6 @@ def bot(
     for user_message, bot_message in history[:-1]:
         message_tokens = get_message_tokens(model=model, role="user", content=user_message)
         tokens.extend(message_tokens)
-        # if bot_message:
-        #     message_tokens = get_message_tokens(model=model, role="bot", content=bot_message)
-        #     tokens.extend(message_tokens)
 
     last_user_message = history[-1][0]
     if retrieved_docs:
