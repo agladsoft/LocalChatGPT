@@ -136,10 +136,17 @@ def build_index(file_paths, db, chunk_size, chunk_overlap, file_warning):
     #             for source in value:
     #                 if path.split('/')[-1] == source["source"].split('/')[-1]:
     #                     print(path)
-    # import chromadb
-    # client = chromadb.Client(Settings(persist_directory="db"))
-    # coll = client.get_or_create_collection("langchain")
-    # print(coll.get())  # Gets all the data
+    if db:
+        data = db.get()
+        files_db = {dict_data['source'].split('/')[-1] for dict_data in data["metadatas"]}
+        files_load = {dict_data.metadata["source"].split('/')[-1] for dict_data in fixed_documents}
+        if files_load == files_db:
+            db.update_documents(ids, fixed_documents)
+            return db, file_warning
+        # for document, _id in zip(fixed_documents, ids):
+        #     for id_db in data["ids"]:
+        #         if id_db == _id:
+        #             db.update_documents(_id, document)
 
     db = Chroma.from_documents(
         documents=fixed_documents,
@@ -226,9 +233,9 @@ def bot(
     for user_message, bot_message in history[:-1]:
         message_tokens = get_message_tokens(model=model, role="user", content=user_message)
         tokens.extend(message_tokens)
-        if bot_message:
-            message_tokens = get_message_tokens(model=model, role="bot", content=bot_message)
-            tokens.extend(message_tokens)
+        # if bot_message:
+        #     message_tokens = get_message_tokens(model=model, role="bot", content=bot_message)
+        #     tokens.extend(message_tokens)
 
     last_user_message = history[-1][0]
     if retrieved_docs:
@@ -267,7 +274,7 @@ with gr.Blocks(
 
     with gr.Row():
         with gr.Column(scale=5):
-            file_output = gr.File(file_count="multiple", label="Загрузка файлов")
+            file_output = gr.UploadButton(file_count="multiple", label="Загрузка файлов")
             file_paths = gr.State([])
             file_warning = gr.Markdown("Фрагменты ещё не загружены!")
 
@@ -351,7 +358,7 @@ with gr.Blocks(
                 clear = gr.Button("Очистить")
 
     # Upload files
-    upload_event = file_output.change(
+    upload_event = file_output.upload(
         fn=upload_files,
         inputs=[file_output, file_paths],
         outputs=[file_paths],
