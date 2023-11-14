@@ -49,7 +49,12 @@ LOADER_MAPPING = {
     ".txt": (TextLoader, {"encoding": "utf8"}),
 }
 
-
+models = [
+    "saiga_7b_lora_llamacpp",
+    "saiga_13b_lora_llamacpp",
+    "saiga2_7b_lora_llamacpp",
+    "saiga2_13b_lora_llamacpp"
+]
 repo_name = "IlyaGusev/saiga_7b_lora_llamacpp"
 model_name = "ggml-model-q4_1.bin"
 embedder_name = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
@@ -141,7 +146,7 @@ def build_index(file_paths, db, chunk_size, chunk_overlap, file_warning):
     return db, file_warning
 
 
-def user(message, history, system_prompt):
+def user(message, history):
     new_history = history + [[message, None]]
     return "", new_history
 
@@ -161,7 +166,6 @@ def retrieve(history, db, retrieved_docs, k_documents):
 
 def bot(
     history,
-    system_prompt,
     conversation_id,
     retrieved_docs,
     top_p,
@@ -207,9 +211,10 @@ with gr.Blocks(
 ) as demo:
     db = gr.State(None)
     conversation_id = gr.State(get_uuid)
-    favicon = '<img src="https://cdn.midjourney.com/b88e5beb-6324-4820-8504-a1a37a9ba36d/0_1.png" width="48px" style="display: inline">'
+    favicon = r'<img src="https://cdn.midjourney.com/b88e5beb-6324-4820-8504-a1a37a9ba36d/0_1.png" ' \
+              r'width="48px" style="display: inline">'
     gr.Markdown(
-        f"""<h1><center>{favicon}Saiga 7B llama.cpp: retrieval QA</center></h1>
+        f"""<h1><center>{favicon} Saiga 7B llama.cpp: retrieval QA</center></h1>
         """
     )
 
@@ -254,9 +259,18 @@ with gr.Blocks(
             placeholder="Появятся после задавания вопросов",
             interactive=False
         )
+
+    with gr.Row(elem_id="model_selector_row"):
+        model_selector = gr.Dropdown(
+            choices=models,
+            value=models[0] if len(models) > 0 else "",
+            interactive=True,
+            show_label=False,
+            container=False,
+        )
+
     with gr.Row():
         with gr.Column(scale=5):
-            system_prompt = gr.Textbox(label="Системный промпт", placeholder="", value=SYSTEM_PROMPT, interactive=False)
             chatbot = gr.Chatbot(label="Диалог").style(height=400)
         with gr.Column(min_width=80, scale=1):
             with gr.Tab(label="Параметры генерации"):
@@ -314,7 +328,7 @@ with gr.Blocks(
     # Pressing Enter
     submit_event = msg.submit(
         fn=user,
-        inputs=[msg, chatbot, system_prompt],
+        inputs=[msg, chatbot],
         outputs=[msg, chatbot],
         queue=False,
     ).success(
@@ -326,7 +340,6 @@ with gr.Blocks(
         fn=bot,
         inputs=[
             chatbot,
-            system_prompt,
             conversation_id,
             retrieved_docs,
             top_p,
@@ -340,7 +353,7 @@ with gr.Blocks(
     # Pressing the button
     submit_click_event = submit.click(
         fn=user,
-        inputs=[msg, chatbot, system_prompt],
+        inputs=[msg, chatbot],
         outputs=[msg, chatbot],
         queue=False,
     ).success(
@@ -352,7 +365,6 @@ with gr.Blocks(
         fn=bot,
         inputs=[
             chatbot,
-            system_prompt,
             conversation_id,
             retrieved_docs,
             top_p,
