@@ -1,5 +1,5 @@
+import os
 import gradio as gr
-
 from uuid import uuid4
 from huggingface_hub import snapshot_download
 from langchain.document_loaders import (
@@ -22,6 +22,7 @@ from chromadb.config import Settings
 from llama_cpp import Llama
 
 
+FAVICON_PATH = 'https://space-course.ru/wp-content/uploads/2023/06/Fox_logo_512-2.png'
 SYSTEM_PROMPT = "Ты — Сайга, русскоязычный автоматический ассистент. Ты разговариваешь с людьми и помогаешь им."
 SYSTEM_TOKEN = 1788
 USER_TOKEN = 1404
@@ -49,23 +50,25 @@ LOADER_MAPPING = {
     ".txt": (TextLoader, {"encoding": "utf8"}),
 }
 
-models = [
-    "saiga_7b_lora_llamacpp",
-    "saiga_13b_lora_llamacpp",
-    "saiga2_7b_lora_llamacpp",
-    "saiga2_13b_lora_llamacpp"
+llama_models: list = []
+
+models: list = [
+    "saiga_7b_lora",
+    "saiga_13b_lora"
 ]
-repo_name = "IlyaGusev/saiga_7b_lora_llamacpp"
-model_name = "ggml-model-q4_1.bin"
+
 embedder_name = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
 
-snapshot_download(repo_id=repo_name, local_dir=".", allow_patterns=model_name)
-
-model = Llama(
-    model_path=model_name,
-    n_ctx=2000,
-    n_parts=1,
-)
+for model in models:
+    repo_name = f"IlyaGusev/{model}_llamacpp"
+    model_name = "ggml-model-q4_1.bin"
+    os.makedirs(model, exist_ok=True)
+    snapshot_download(repo_id=repo_name, local_dir=model, allow_patterns=model_name)
+    llama_models.append(Llama(
+        model_path=f"{model}/{model_name}",
+        n_ctx=2000,
+        n_parts=1,
+    ))
 
 max_new_tokens = 1500
 embeddings = HuggingFaceEmbeddings(model_name=embedder_name)
@@ -170,10 +173,14 @@ def bot(
     retrieved_docs,
     top_p,
     top_k,
-    temp
+    temp,
+    model_selector
 ):
     if not history:
         return
+
+    print(model_selector)
+    model = next((model for model in llama_models if model_selector in model.model_path), None)
 
     tokens = get_system_tokens(model)[:]
     tokens.append(LINEBREAK_TOKEN)
@@ -211,11 +218,11 @@ with gr.Blocks(
 ) as demo:
     db = gr.State(None)
     conversation_id = gr.State(get_uuid)
-    favicon = r'<img src="https://cdn.midjourney.com/b88e5beb-6324-4820-8504-a1a37a9ba36d/0_1.png" ' \
-              r'width="48px" style="display: inline">'
+    favicon = f'<img src="{FAVICON_PATH}" width="48px" style="display: inline">'
     gr.Markdown(
-        f"""<h1><center>{favicon} Saiga 7B llama.cpp: retrieval QA</center></h1>
-        """
+        f"""<h1><center>{favicon} Я Лисум, текстовый ассистент на основе GPT</center></h1>
+            <p>Я быстро учусь новому. Просто загрузи свои файлы и задавай любые вопросы.</p>
+            """
     )
 
     with gr.Row():
@@ -344,7 +351,8 @@ with gr.Blocks(
             retrieved_docs,
             top_p,
             top_k,
-            temp
+            temp,
+            model_selector
         ],
         outputs=chatbot,
         queue=True,
@@ -369,7 +377,8 @@ with gr.Blocks(
             retrieved_docs,
             top_p,
             top_k,
-            temp
+            temp,
+            model_selector
         ],
         outputs=chatbot,
         queue=True,
