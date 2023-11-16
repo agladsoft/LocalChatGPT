@@ -154,6 +154,10 @@ def user(message, history):
     return "", new_history
 
 
+def regenerate_response(history):
+    return "", history
+
+
 def retrieve(history, db, retrieved_docs, k_documents):
     if db:
         last_user_message = history[-1][0]
@@ -274,7 +278,7 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
 
     with gr.Row():
         with gr.Column(scale=3):
-            file_output = gr.UploadButton(file_count="multiple", label="Загрузка файлов")
+            file_output = gr.Files(file_count="multiple", label="Загрузка файлов")
             file_paths = gr.State([])
             file_warning = gr.Markdown("Фрагменты ещё не загружены!")
 
@@ -289,13 +293,14 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
 
     with gr.Row():
         with gr.Column(scale=5):
-            chatbot = gr.Chatbot(label="Диалог").style(height=400)
+            chatbot = gr.Chatbot(label="Диалог", height=400)
         with gr.Column(min_width=200, scale=4):
             retrieved_docs = gr.Textbox(
                 label="Извлеченные фрагменты",
                 placeholder="Появятся после задавания вопросов",
-                interactive=False
-            ).style(height=400)
+                interactive=False,
+                height=400
+            )
 
     with gr.Row():
         with gr.Column(scale=20):
@@ -312,7 +317,7 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
         up_vote_btn = gr.Button(value="👍  Понравилось")
         down_vote_btn = gr.Button(value="👎  Не понравилось")
         stop = gr.Button(value="⛔ Остановить")
-        regenerate_btn = gr.Button(value="🔄  Переотправить")
+        regenerate = gr.Button(value="🔄  Повторить")
         clear = gr.Button(value="🗑️  Очистить")
 
     # Upload files
@@ -341,14 +346,7 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
         queue=True,
     ).success(
         fn=bot,
-        inputs=[
-            chatbot,
-            retrieved_docs,
-            top_p,
-            top_k,
-            temp,
-            model_selector
-        ],
+        inputs=[chatbot, retrieved_docs, top_p, top_k, temp, model_selector],
         outputs=chatbot,
         queue=True,
     )
@@ -366,14 +364,7 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
         queue=True,
     ).success(
         fn=bot,
-        inputs=[
-            chatbot,
-            retrieved_docs,
-            top_p,
-            top_k,
-            temp,
-            model_selector
-        ],
+        inputs=[chatbot, retrieved_docs, top_p, top_k, temp, model_selector],
         outputs=chatbot,
         queue=True,
     )
@@ -385,6 +376,24 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
         outputs=None,
         cancels=[submit_event, submit_click_event],
         queue=False,
+    )
+
+    # Regenerate
+    regenerate.click(
+        fn=regenerate_response,
+        inputs=[chatbot],
+        outputs=[msg, chatbot],
+        queue=False,
+    ).success(
+        fn=retrieve,
+        inputs=[chatbot, db, retrieved_docs, k_documents],
+        outputs=[retrieved_docs],
+        queue=True,
+    ).success(
+        fn=bot,
+        inputs=[chatbot, retrieved_docs, top_p, top_k, temp, model_selector],
+        outputs=chatbot,
+        queue=True,
     )
 
     # Clear history
