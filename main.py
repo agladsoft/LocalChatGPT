@@ -169,7 +169,6 @@ def retrieve(history, db, retrieved_docs, k_documents):
 
 def bot(
     history,
-    conversation_id,
     retrieved_docs,
     top_p,
     top_k,
@@ -213,25 +212,30 @@ def bot(
         yield history
 
 
-with gr.Blocks(
-    theme=gr.themes.Soft()
-) as demo:
+with gr.Blocks(theme=gr.themes.Soft()) as demo:
     db = gr.State(None)
-    conversation_id = gr.State(get_uuid)
     favicon = f'<img src="{FAVICON_PATH}" width="48px" style="display: inline">'
     gr.Markdown(
         f"""<h1><center>{favicon} Я Лисум, текстовый ассистент на основе GPT</center></h1>
             <p>Я быстро учусь новому. Просто загрузи свои файлы и задавай любые вопросы.</p>
-            """
+        """
     )
 
     with gr.Row():
-        with gr.Column(scale=5):
+        with gr.Column(scale=3):
             file_output = gr.UploadButton(file_count="multiple", label="Загрузка файлов")
             file_paths = gr.State([])
             file_warning = gr.Markdown("Фрагменты ещё не загружены!")
-
-        with gr.Column(min_width=200, scale=3):
+        with gr.Column(min_width=50, scale=4):
+            k_documents = gr.Slider(
+                minimum=1,
+                maximum=10,
+                value=2,
+                step=1,
+                interactive=True,
+                label="Кол-во фрагментов для контекста"
+            )
+        with gr.Column(min_width=50, scale=3):
             with gr.Tab(label="Параметры нарезки"):
                 chunk_size = gr.Slider(
                     minimum=50,
@@ -250,23 +254,6 @@ with gr.Blocks(
                     label="Пересечение"
                 )
 
-    with gr.Row():
-        k_documents = gr.Slider(
-            minimum=1,
-            maximum=10,
-            value=2,
-            step=1,
-            interactive=True,
-            label="Кол-во фрагментов для контекста"
-        )
-    with gr.Row():
-        retrieved_docs = gr.Textbox(
-            lines=6,
-            label="Извлеченные фрагменты",
-            placeholder="Появятся после задавания вопросов",
-            interactive=False
-        )
-
     with gr.Row(elem_id="model_selector_row"):
         model_selector = gr.Dropdown(
             choices=models,
@@ -279,45 +266,57 @@ with gr.Blocks(
     with gr.Row():
         with gr.Column(scale=5):
             chatbot = gr.Chatbot(label="Диалог").style(height=400)
-        with gr.Column(min_width=80, scale=1):
-            with gr.Tab(label="Параметры генерации"):
-                top_p = gr.Slider(
-                    minimum=0.0,
-                    maximum=1.0,
-                    value=0.9,
-                    step=0.05,
-                    interactive=True,
-                    label="Top-p",
-                )
-                top_k = gr.Slider(
-                    minimum=10,
-                    maximum=100,
-                    value=30,
-                    step=5,
-                    interactive=True,
-                    label="Top-k",
-                )
-                temp = gr.Slider(
-                    minimum=0.0,
-                    maximum=2.0,
-                    value=0.1,
-                    step=0.1,
-                    interactive=True,
-                    label="Temp"
-                )
+        with gr.Column(min_width=200, scale=3):
+            retrieved_docs = gr.Textbox(
+                lines=6,
+                label="Извлеченные фрагменты",
+                placeholder="Появятся после задавания вопросов",
+                interactive=False
+            )
 
     with gr.Row():
-        with gr.Column():
+        with gr.Column(scale=20):
             msg = gr.Textbox(
                 label="Отправить сообщение",
-                placeholder="Отправить сообщение",
                 show_label=False,
-            ).style(container=False)
-        with gr.Column():
-            with gr.Row():
-                submit = gr.Button("Отправить")
-                stop = gr.Button("Остановить")
-                clear = gr.Button("Очистить")
+                placeholder="Отправить сообщение",
+                container=False
+            )
+        with gr.Column(scale=3, min_width=100):
+            submit = gr.Button("📤 Отправить")
+
+    with gr.Row() as button_row:
+        up_vote_btn = gr.Button(value="👍  Понравилось")
+        down_vote_btn = gr.Button(value="👎  Не понравилось")
+        stop = gr.Button(value="⛔ Остановить")
+        regenerate_btn = gr.Button(value="🔄  Переотправить")
+        clear = gr.Button(value="🗑️  Очистить")
+
+    with gr.Accordion("Параметры генерации", open=False) as parameter_row:
+        top_p = gr.Slider(
+            minimum=0.0,
+            maximum=1.0,
+            value=0.9,
+            step=0.05,
+            interactive=True,
+            label="Top-p",
+        )
+        top_k = gr.Slider(
+            minimum=10,
+            maximum=100,
+            value=30,
+            step=5,
+            interactive=True,
+            label="Top-k",
+        )
+        temp = gr.Slider(
+            minimum=0.0,
+            maximum=2.0,
+            value=0.1,
+            step=0.1,
+            interactive=True,
+            label="Temp"
+        )
 
     # Upload files
     upload_event = file_output.upload(
@@ -347,7 +346,6 @@ with gr.Blocks(
         fn=bot,
         inputs=[
             chatbot,
-            conversation_id,
             retrieved_docs,
             top_p,
             top_k,
@@ -373,7 +371,6 @@ with gr.Blocks(
         fn=bot,
         inputs=[
             chatbot,
-            conversation_id,
             retrieved_docs,
             top_p,
             top_k,
