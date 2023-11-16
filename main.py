@@ -216,9 +216,7 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
     db = gr.State(None)
     favicon = f'<img src="{FAVICON_PATH}" width="48px" style="display: inline">'
     gr.Markdown(
-        f"""<h1><center>{favicon} Я Лисум, текстовый ассистент на основе GPT</center></h1>
-            <p>Я быстро учусь новому. Просто загрузи свои файлы и задавай любые вопросы.</p>
-        """
+        f"""<h1><center>{favicon} Я Лисум, текстовый ассистент на основе GPT</center></h1>"""
     )
 
     with gr.Accordion("Параметры", open=False) as parameter_row:
