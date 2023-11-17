@@ -53,19 +53,22 @@ LOADER_MAPPING = {
 llama_models: list = []
 
 models: list = [
-    "saiga_7b_lora",
-    "saiga_13b_lora"
+    # "saiga_7b_lora/ggml-model-q4_1.bin",
+    # "saiga_7b_lora/ggml-model-q8_0.bin",
+    # "llama2_7b_bin/llama-2-7b-chat.ggmlv3.q2_K.bin"
+    "saiga2_7b_gguf/model-q2_K.gguf",
+    "saiga2_7b_gguf/model-q4_K.gguf"
 ]
 
 embedder_name = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
 
 for model in models:
-    repo_name = f"IlyaGusev/{model}_llamacpp"
-    model_name = "ggml-model-q4_1.bin"
-    os.makedirs(model, exist_ok=True)
-    snapshot_download(repo_id=repo_name, local_dir=model, allow_patterns=model_name)
+    # repo_name = f"IlyaGusev/{model}_cpp"
+    # model_name = "model-q4_K.gguf"
+    os.makedirs(model.split("/")[0], exist_ok=True)
+    # snapshot_download(repo_id=repo_name, local_dir=model, allow_patterns=model_name)
     llama_models.append(Llama(
-        model_path=f"{model}/{model_name}",
+        model_path=model,
         n_ctx=2000,
         n_parts=1,
     ))
