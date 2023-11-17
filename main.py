@@ -57,7 +57,9 @@ models: list = [
     # "saiga_7b_lora/ggml-model-q8_0.bin",
     # "llama2_7b_bin/llama-2-7b-chat.ggmlv3.q2_K.bin"
     "saiga2_7b_gguf/model-q2_K.gguf",
-    "saiga2_7b_gguf/model-q4_K.gguf"
+    "saiga2_7b_gguf/model-q4_K.gguf",
+    "llama2_7b_gguf/llama-2-7b-chat.Q2_K.gguf",
+    "openbuddy_llama2_13b_gguf/openbuddy-llama2-13b-v11.1.Q2_K.gguf"
 ]
 
 embedder_name = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
