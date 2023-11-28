@@ -1,9 +1,10 @@
 import os
+import tempfile
 import gradio as gr
-from uuid import uuid4
 from __init__ import *
 from llama_cpp import Llama
 from chromadb.config import Settings
+from typing import List, Tuple, Optional
 from langchain.vectorstores import Chroma
 from langchain.docstore.document import Document
 from langchain.embeddings import HuggingFaceEmbeddings
@@ -15,9 +16,9 @@ class LocalChatGPT:
         self.llama_models, self.embeddings = self.initialize_app()
 
     @staticmethod
-    def initialize_app():
+    def initialize_app() -> Tuple[List[Llama], HuggingFaceEmbeddings]:
         """
-
+        Загружаем все модели из списка.
         :return:
         """
         llama_models: list = []
@@ -32,28 +33,20 @@ class LocalChatGPT:
         return llama_models, HuggingFaceEmbeddings(model_name=EMBEDDER_NAME)
 
     @staticmethod
-    def get_uuid():
-        """
-
-        :return:
-        """
-        return str(uuid4())
-
-    @staticmethod
     def load_single_document(file_path: str) -> Document:
         """
-
+        Загружаем один документ.
         :param file_path:
         :return:
         """
-        ext = "." + file_path.rsplit(".", 1)[-1]
+        ext: str = "." + file_path.rsplit(".", 1)[-1]
         assert ext in LOADER_MAPPING
         loader_class, loader_args = LOADER_MAPPING[ext]
         loader = loader_class(file_path, **loader_args)
         return loader.load()[0]
 
     @staticmethod
-    def get_message_tokens(model, role, content):
+    def get_message_tokens(model: Llama, role: str, content: str) -> list:
         """
 
         :param model:
@@ -61,44 +54,50 @@ class LocalChatGPT:
         :param content:
         :return:
         """
-        message_tokens = model.tokenize(content.encode("utf-8"))
+        message_tokens: list = model.tokenize(content.encode("utf-8"))
         message_tokens.insert(1, ROLE_TOKENS[role])
         message_tokens.insert(2, LINEBREAK_TOKEN)
         message_tokens.append(model.token_eos())
         return message_tokens
 
-    def get_system_tokens(self, model):
+    def get_system_tokens(self, model: Llama) -> list:
         """
 
         :param model:
         :return:
         """
-        system_message = {"role": "system", "content": SYSTEM_PROMPT}
+        system_message: dict = {"role": "system", "content": SYSTEM_PROMPT}
         return self.get_message_tokens(model, **system_message)
 
     @staticmethod
-    def upload_files(files):
+    def upload_files(files: List[tempfile.TemporaryFile]) -> List[str]:
         """
 
         :param files:
         :return:
         """
-        file_paths = [f.name for f in files]
-        return file_paths
+        return [f.name for f in files]
 
     @staticmethod
-    def process_text(text):
+    def process_text(text: str) -> Optional[str]:
         """
 
         :param text:
         :return:
         """
-        lines = text.split("\n")
+        lines: list = text.split("\n")
         lines = [line for line in lines if len(line.strip()) > 2]
         text = "\n".join(lines).strip()
         return None if len(text) < 10 else text
 
-    def build_index(self, file_paths, db, chunk_size, chunk_overlap, file_warning):
+    def build_index(
+        self,
+        file_paths: List[str],
+        db: Optional[Chroma],
+        chunk_size: int,
+        chunk_overlap: int,
+        file_warning: str
+    ):
         """
 
         :param file_paths:
@@ -108,17 +107,19 @@ class LocalChatGPT:
         :param file_warning:
         :return:
         """
-        documents = [self.load_single_document(path) for path in file_paths]
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+        documents: List[Document] = [self.load_single_document(path) for path in file_paths]
+        text_splitter: RecursiveCharacterTextSplitter = RecursiveCharacterTextSplitter(
+            chunk_size=chunk_size, chunk_overlap=chunk_overlap
+        )
         documents = text_splitter.split_documents(documents)
-        fixed_documents = []
+        fixed_documents: List[Document] = []
         for doc in documents:
             doc.page_content = self.process_text(doc.page_content)
             if not doc.page_content:
                 continue
             fixed_documents.append(doc)
 
-        ids = []
+        ids: List[str] = []
         for path in file_paths:
             for i in range(1, len(fixed_documents) + 1):
                 ids.append(f"{path.split('/')[-1].replace('.txt', '')}{i}")

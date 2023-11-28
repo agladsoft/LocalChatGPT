@@ -12,20 +12,20 @@ from langchain.document_loaders import (
 )
 
 
-FAVICON_PATH = 'https://space-course.ru/wp-content/uploads/2023/06/Fox_logo_512-2.png'
-SYSTEM_PROMPT = "Ты — Сайга, русскоязычный автоматический ассистент. Ты разговариваешь с людьми и помогаешь им."
-SYSTEM_TOKEN = 1788
-USER_TOKEN = 1404
-BOT_TOKEN = 9225
-LINEBREAK_TOKEN = 13
+FAVICON_PATH: str = 'https://space-course.ru/wp-content/uploads/2023/06/Fox_logo_512-2.png'
+SYSTEM_PROMPT: str = "Ты — Сайга, русскоязычный автоматический ассистент. Ты разговариваешь с людьми и помогаешь им."
+SYSTEM_TOKEN: int = 1788
+USER_TOKEN: int = 1404
+BOT_TOKEN: int = 9225
+LINEBREAK_TOKEN: int = 13
 
-ROLE_TOKENS = {
+ROLE_TOKENS: dict = {
     "user": USER_TOKEN,
     "bot": BOT_TOKEN,
     "system": SYSTEM_TOKEN
 }
 
-LOADER_MAPPING = {
+LOADER_MAPPING: dict = {
     ".csv": (CSVLoader, {}),
     ".doc": (UnstructuredWordDocumentLoader, {}),
     ".docx": (UnstructuredWordDocumentLoader, {}),
@@ -48,6 +48,6 @@ MODELS: list = [
     "openbuddy_llama2_13b_gguf/openbuddy-llama2-13b-v11.1.Q2_K.gguf"
 ]
 
-EMBEDDER_NAME = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+EMBEDDER_NAME: str = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
 
-MAX_NEW_TOKENS = 1500
+MAX_NEW_TOKENS: int = 1500
