@@ -16,6 +16,10 @@ class LocalChatGPT:
 
     @staticmethod
     def initialize_app():
+        """
+
+        :return:
+        """
         llama_models: list = []
         for model in MODELS:
             os.makedirs(model.split("/")[0], exist_ok=True)
@@ -29,10 +33,19 @@ class LocalChatGPT:
 
     @staticmethod
     def get_uuid():
+        """
+
+        :return:
+        """
         return str(uuid4())
 
     @staticmethod
     def load_single_document(file_path: str) -> Document:
+        """
+
+        :param file_path:
+        :return:
+        """
         ext = "." + file_path.rsplit(".", 1)[-1]
         assert ext in LOADER_MAPPING
         loader_class, loader_args = LOADER_MAPPING[ext]
@@ -41,6 +54,13 @@ class LocalChatGPT:
 
     @staticmethod
     def get_message_tokens(model, role, content):
+        """
+
+        :param model:
+        :param role:
+        :param content:
+        :return:
+        """
         message_tokens = model.tokenize(content.encode("utf-8"))
         message_tokens.insert(1, ROLE_TOKENS[role])
         message_tokens.insert(2, LINEBREAK_TOKEN)
@@ -48,22 +68,46 @@ class LocalChatGPT:
         return message_tokens
 
     def get_system_tokens(self, model):
+        """
+
+        :param model:
+        :return:
+        """
         system_message = {"role": "system", "content": SYSTEM_PROMPT}
         return self.get_message_tokens(model, **system_message)
 
     @staticmethod
     def upload_files(files):
+        """
+
+        :param files:
+        :return:
+        """
         file_paths = [f.name for f in files]
         return file_paths
 
     @staticmethod
     def process_text(text):
+        """
+
+        :param text:
+        :return:
+        """
         lines = text.split("\n")
         lines = [line for line in lines if len(line.strip()) > 2]
         text = "\n".join(lines).strip()
         return None if len(text) < 10 else text
 
     def build_index(self, file_paths, db, chunk_size, chunk_overlap, file_warning):
+        """
+
+        :param file_paths:
+        :param db:
+        :param chunk_size:
+        :param chunk_overlap:
+        :param file_warning:
+        :return:
+        """
         documents = [self.load_single_document(path) for path in file_paths]
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
         documents = text_splitter.split_documents(documents)
@@ -107,10 +151,22 @@ class LocalChatGPT:
 
     @staticmethod
     def regenerate_response(history):
+        """
+
+        :param history:
+        :return:
+        """
         return "", history
 
     @staticmethod
     def retrieve(history, db, retrieved_docs):
+        """
+
+        :param history:
+        :param db:
+        :param retrieved_docs:
+        :return:
+        """
         if db:
             last_user_message = history[-1][0]
             docs = db.similarity_search(last_user_message)
@@ -123,6 +179,16 @@ class LocalChatGPT:
         return retrieved_docs
 
     def bot(self, history, retrieved_docs, top_p, top_k, temp, model_selector):
+        """
+
+        :param history:
+        :param retrieved_docs:
+        :param top_p:
+        :param top_k:
+        :param temp:
+        :param model_selector:
+        :return:
+        """
         if not history:
             return
         model = next((model for model in self.llama_models if model_selector in model.model_path), None)
@@ -159,6 +225,10 @@ class LocalChatGPT:
             yield history
 
     def run(self):
+        """
+
+        :return:
+        """
         with gr.Blocks(theme=gr.themes.Soft()) as demo:
             db = gr.State(None)
             favicon = f'<img src="{FAVICON_PATH}" width="48px" style="display: inline">'
