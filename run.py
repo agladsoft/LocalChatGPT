@@ -287,8 +287,11 @@ class LocalChatGPT:
         """
         with gr.Blocks(theme=gr.themes.Soft()) as demo:
             db: Optional[Chroma] = gr.State(None)
-            # client = chromadb.PersistentClient()
-            # db: Optional[Chroma] = client.get_collection("all-my-documents")
+            try:
+                client = chromadb.PersistentClient()
+                db = client.get_collection("all-my-documents")
+            except Exception:
+                pass
             favicon = f'<img src="{FAVICON_PATH}" width="48px" style="display: inline">'
             gr.Markdown(
                 f"""<h1><center>{favicon} Я Лисум, текстовый ассистент на основе GPT</center></h1>"""
