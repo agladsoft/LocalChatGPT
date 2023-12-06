@@ -1,3 +1,4 @@
+import os
 from langchain.document_loaders import (
     CSVLoader,
     EverNoteLoader,
@@ -43,11 +44,14 @@ LOADER_MAPPING: dict = {
 
 MODELS: list = [
     "saiga2_7b_gguf/model-q2_K.gguf",
-    "saiga2_7b_gguf/model-q4_K.gguf",
-    "llama2_7b_gguf/llama-2-7b-chat.Q2_K.gguf",
-    "openbuddy_llama2_13b_gguf/openbuddy-llama2-13b-v11.1.Q2_K.gguf"
+    # "saiga2_7b_gguf/model-q4_K.gguf",
+    # "llama2_7b_gguf/llama-2-7b-chat.Q2_K.gguf",
+    # "openbuddy_llama2_13b_gguf/openbuddy-llama2-13b-v11.1.Q2_K.gguf"
 ]
 
 EMBEDDER_NAME: str = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
 
 MAX_NEW_TOKENS: int = 1500
+
+ABS_PATH = os.path.dirname(os.path.abspath(__file__))
+DB_DIR = os.path.join(ABS_PATH, "db")

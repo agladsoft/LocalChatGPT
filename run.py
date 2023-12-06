@@ -1,11 +1,14 @@
-import os
+import contextlib
 import tempfile
 import itertools
 import gradio as gr
+from chromadb.utils import embedding_functions
+from langchain.embeddings.sentence_transformer import SentenceTransformerEmbeddings
 from __init__ import *
 from llama_cpp import Llama
 from chromadb.config import Settings
 from langchain.vectorstores import Chroma
+import chromadb
 from typing import List, Tuple, Optional, Union
 from langchain.docstore.document import Document
 from langchain.embeddings import HuggingFaceEmbeddings
@@ -97,6 +100,13 @@ class LocalChatGPT:
         fixed_documents: List[Document],
         ids: List[str]
     ) -> Union[Optional[Chroma], str]:
+        """
+
+        :param db:
+        :param fixed_documents:
+        :param ids:
+        :return:
+        """
         if db:
             data: dict = db.get()
             files_db = {dict_data['source'].split('/')[-1] for dict_data in data["metadatas"]}
@@ -106,13 +116,15 @@ class LocalChatGPT:
                 # db.update_documents(ids, fixed_documents)
 
                 db.delete(data['ids'])
-                db.add_texts(
-                    texts=[doc.page_content for doc in fixed_documents],
+                db.add(
+                    documents=[doc.page_content for doc in fixed_documents],
                     metadatas=[doc.metadata for doc in fixed_documents],
                     ids=ids
                 )
                 file_warning = f"Загружено {len(fixed_documents)} фрагментов! Можно задавать вопросы."
                 return db, file_warning
+        else:
+            return None, "Фрагменты ещё не загружены!"
 
     def build_index(
         self,
@@ -146,18 +158,21 @@ class LocalChatGPT:
             for path, i in itertools.product(file_paths, range(1, len(fixed_documents) + 1))
         ]
 
-        self.update_text_db(db, fixed_documents, ids)
-
-        db = Chroma.from_documents(
-            documents=fixed_documents,
-            embedding=self.embeddings,
-            ids=ids,
-            client_settings=Settings(
-                anonymized_telemetry=False,
-                persist_directory="db"
+        db, file_warning = self.update_text_db(db, fixed_documents, ids)
+        client = chromadb.PersistentClient()
+        if not db:
+            with contextlib.suppress(ValueError):
+                db = client.get_collection("all-my-documents")
+                file_warning = f"Загружено {len(fixed_documents)} фрагментов! Можно задавать вопросы."
+                return db, file_warning
+        if not db:
+            db = client.create_collection("all-my-documents")
+            db.add(
+                documents=[doc.page_content for doc in fixed_documents],
+                metadatas=[doc.metadata for doc in fixed_documents],
+                ids=ids
             )
-        )
-        file_warning = f"Загружено {len(fixed_documents)} фрагментов! Можно задавать вопросы."
+            file_warning = f"Загружено {len(fixed_documents)} фрагментов! Можно задавать вопросы."
         return db, file_warning
 
     @staticmethod
@@ -187,19 +202,36 @@ class LocalChatGPT:
         if db:
             last_user_message = history[-1][0]
             try:
-                docs = db.similarity_search(last_user_message, k=k_documents)
+                # docs = db.similarity_search(last_user_message, k=k_documents)
+                docs = db.query(
+                    query_texts=[last_user_message],
+                    n_results=k_documents
+                )
+
                 # retriever = db.as_retriever(search_kwargs={"k": k_documents})
                 # docs = retriever.get_relevant_documents(last_user_message)
             except RuntimeError:
-                docs = db.similarity_search(last_user_message, k=1)
+                # docs = db.similarity_search(last_user_message, k=1)
+                docs = db.query(
+                    query_texts=[last_user_message],
+                    n_results=1
+                )
                 # retriever = db.as_retriever(search_kwargs={"k": 1})
                 # docs = retriever.get_relevant_documents(last_user_message)
+
             source_docs = set()
-            for doc in docs:
-                for content in doc.metadata.values():
-                    source_docs.add(content.split("/")[-1])
-            retrieved_docs = "\n\n".join([doc.page_content for doc in docs])
+            for doc in docs["metadatas"][0]:
+                source_docs.add(doc["source"].split("/")[-1])
+            retrieved_docs = "\n\n".join([doc for doc in docs["documents"][0]])
             retrieved_docs = f"Документ - {''.join(list(source_docs))}.\n\n{retrieved_docs}"
+
+
+            # source_docs = set()
+            # for doc in docs:
+            #     for content in doc.metadata.values():
+            #         source_docs.add(content.split("/")[-1])
+            # retrieved_docs = "\n\n".join([doc.page_content for doc in docs])
+            # retrieved_docs = f"Документ - {''.join(list(source_docs))}.\n\n{retrieved_docs}"
         return retrieved_docs
 
     def bot(self, history, retrieved_docs, top_p, top_k, temp, model_selector):
@@ -255,6 +287,8 @@ class LocalChatGPT:
         """
         with gr.Blocks(theme=gr.themes.Soft()) as demo:
             db: Optional[Chroma] = gr.State(None)
+            # client = chromadb.PersistentClient()
+            # db: Optional[Chroma] = client.get_collection("all-my-documents")
             favicon = f'<img src="{FAVICON_PATH}" width="48px" style="display: inline">'
             gr.Markdown(
                 f"""<h1><center>{favicon} Я Лисум, текстовый ассистент на основе GPT</center></h1>"""
