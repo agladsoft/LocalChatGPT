@@ -1,11 +1,12 @@
 import os
 import tempfile
+import itertools
 import gradio as gr
 from __init__ import *
 from llama_cpp import Llama
 from chromadb.config import Settings
-from typing import List, Tuple, Optional
 from langchain.vectorstores import Chroma
+from typing import List, Tuple, Optional, Union
 from langchain.docstore.document import Document
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -90,13 +91,35 @@ class LocalChatGPT:
         text = "\n".join(lines).strip()
         return None if len(text) < 10 else text
 
+    @staticmethod
+    def update_text_db(
+        db: Optional[Chroma],
+        fixed_documents: List[Document],
+        ids: List[str]
+    ) -> Union[Optional[Chroma], str]:
+        if db:
+            data: dict = db.get()
+            files_db = {dict_data['source'].split('/')[-1] for dict_data in data["metadatas"]}
+            files_load = {dict_data.metadata["source"].split('/')[-1] for dict_data in fixed_documents}
+            if files_load == files_db:
+                # db.delete([item for item in data['ids'] if item not in ids])
+                # db.update_documents(ids, fixed_documents)
+
+                db.delete(data['ids'])
+                db.add_texts(
+                    texts=[doc.page_content for doc in fixed_documents],
+                    metadatas=[doc.metadata for doc in fixed_documents],
+                    ids=ids
+                )
+                file_warning = f"Загружено {len(fixed_documents)} фрагментов! Можно задавать вопросы."
+                return db, file_warning
+
     def build_index(
         self,
         file_paths: List[str],
         db: Optional[Chroma],
         chunk_size: int,
-        chunk_overlap: int,
-        file_warning: str
+        chunk_overlap: int
     ):
         """
 
@@ -104,7 +127,6 @@ class LocalChatGPT:
         :param db:
         :param chunk_size:
         :param chunk_overlap:
-        :param file_warning:
         :return:
         """
         documents: List[Document] = [self.load_single_document(path) for path in file_paths]
@@ -119,18 +141,12 @@ class LocalChatGPT:
                 continue
             fixed_documents.append(doc)
 
-        ids: List[str] = []
-        for path in file_paths:
-            for i in range(1, len(fixed_documents) + 1):
-                ids.append(f"{path.split('/')[-1].replace('.txt', '')}{i}")
+        ids: List[str] = [
+            f"{path.split('/')[-1].replace('.txt', '')}{i}"
+            for path, i in itertools.product(file_paths, range(1, len(fixed_documents) + 1))
+        ]
 
-        if db:
-            data = db.get()
-            files_db = {dict_data['source'].split('/')[-1] for dict_data in data["metadatas"]}
-            files_load = {dict_data.metadata["source"].split('/')[-1] for dict_data in fixed_documents}
-            if files_load == files_db:
-                db.update_documents(ids, fixed_documents)
-                return db, file_warning
+        self.update_text_db(db, fixed_documents, ids)
 
         db = Chroma.from_documents(
             documents=fixed_documents,
@@ -142,7 +158,6 @@ class LocalChatGPT:
             )
         )
         file_warning = f"Загружено {len(fixed_documents)} фрагментов! Можно задавать вопросы."
-
         return db, file_warning
 
     @staticmethod
@@ -160,17 +175,25 @@ class LocalChatGPT:
         return "", history
 
     @staticmethod
-    def retrieve(history, db, retrieved_docs):
+    def retrieve(history, db: Optional[Chroma], retrieved_docs, k_documents):
         """
 
         :param history:
         :param db:
         :param retrieved_docs:
+        :param k_documents:
         :return:
         """
         if db:
             last_user_message = history[-1][0]
-            docs = db.similarity_search(last_user_message)
+            try:
+                docs = db.similarity_search(last_user_message, k=k_documents)
+                # retriever = db.as_retriever(search_kwargs={"k": k_documents})
+                # docs = retriever.get_relevant_documents(last_user_message)
+            except RuntimeError:
+                docs = db.similarity_search(last_user_message, k=1)
+                # retriever = db.as_retriever(search_kwargs={"k": 1})
+                # docs = retriever.get_relevant_documents(last_user_message)
             source_docs = set()
             for doc in docs:
                 for content in doc.metadata.values():
@@ -231,7 +254,7 @@ class LocalChatGPT:
         :return:
         """
         with gr.Blocks(theme=gr.themes.Soft()) as demo:
-            db = gr.State(None)
+            db: Optional[Chroma] = gr.State(None)
             favicon = f'<img src="{FAVICON_PATH}" width="48px" style="display: inline">'
             gr.Markdown(
                 f"""<h1><center>{favicon} Я Лисум, текстовый ассистент на основе GPT</center></h1>"""
@@ -239,10 +262,10 @@ class LocalChatGPT:
 
             with gr.Accordion("Параметры", open=False):
                 with gr.Tab(label="Параметры извлечения фрагментов из текста"):
-                    gr.Slider(
+                    k_documents = gr.Slider(
                         minimum=1,
                         maximum=10,
-                        value=2,
+                        value=4,
                         step=1,
                         interactive=True,
                         label="Кол-во фрагментов для контекста"
@@ -342,7 +365,7 @@ class LocalChatGPT:
                 queue=True,
             ).success(
                 fn=self.build_index,
-                inputs=[file_paths, db, chunk_size, chunk_overlap, file_warning],
+                inputs=[file_paths, db, chunk_size, chunk_overlap],
                 outputs=[db, file_warning],
                 queue=True
             )
@@ -355,7 +378,7 @@ class LocalChatGPT:
                 queue=False,
             ).success(
                 fn=self.retrieve,
-                inputs=[chatbot, db, retrieved_docs],
+                inputs=[chatbot, db, retrieved_docs, k_documents],
                 outputs=[retrieved_docs],
                 queue=True,
             ).success(
@@ -373,7 +396,7 @@ class LocalChatGPT:
                 queue=False,
             ).success(
                 fn=self.retrieve,
-                inputs=[chatbot, db, retrieved_docs],
+                inputs=[chatbot, db, retrieved_docs, k_documents],
                 outputs=[retrieved_docs],
                 queue=True,
             ).success(
@@ -400,7 +423,7 @@ class LocalChatGPT:
                 queue=False,
             ).success(
                 fn=self.retrieve,
-                inputs=[chatbot, db, retrieved_docs],
+                inputs=[chatbot, db, retrieved_docs, k_documents],
                 outputs=[retrieved_docs],
                 queue=True,
             ).success(
