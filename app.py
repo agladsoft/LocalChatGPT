@@ -1,3 +1,4 @@
+import csv
 import chromadb
 import tempfile
 import itertools
@@ -251,6 +252,14 @@ class LocalChatGPT:
         db: Collection = client.get_or_create_collection(COLLECTION_NAME)
         return db, client
 
+    @staticmethod
+    def authenticate(username: str, password: str) -> bool:
+        with open(AUTH_FILE) as f:
+            file_data: csv.reader = csv.reader(f)
+            headers: list[str] = next(file_data)
+            users: list[dict[str, str]] = [dict(zip(headers, i)) for i in file_data]
+        return bool(list(filter(lambda user: user["username"] == username and user["password"] == password, users)))
+
     def run(self):
         """
 
@@ -442,7 +451,7 @@ class LocalChatGPT:
             clear.click(lambda: None, None, chatbot, queue=False)
 
         demo.queue(max_size=128, concurrency_count=1)
-        demo.launch()
+        demo.launch(auth=self.authenticate)
 
 
 if __name__ == "__main__":
