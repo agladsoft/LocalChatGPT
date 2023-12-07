@@ -366,9 +366,9 @@ class LocalChatGPT:
                         container=False
                     )
                 with gr.Column(scale=3, min_width=100):
-                    submit = gr.Button("📤 Отправить")
+                    submit = gr.Button("📤 Отправить", variant="primary")
 
-            with gr.Row():
+            with gr.Row(elem_id="buttons"):
                 gr.Button(value="👍 Понравилось")
                 gr.Button(value="👎 Не понравилось")
                 stop = gr.Button(value="⛔ Остановить")
