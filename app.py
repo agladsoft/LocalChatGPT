@@ -272,7 +272,7 @@ class LocalChatGPT:
 
         :return:
         """
-        with gr.Blocks(title="Ruscon GPT", theme=gr.themes.Soft(text_size=sizes.text_sm), css=BLOCK_CSS) as demo:
+        with gr.Blocks(title="Ruscon GPT", theme=gr.themes.Soft(text_size=sizes.text_md), css=BLOCK_CSS) as demo:
             db: gr.State = gr.State(None)
             client: gr.State = gr.State(None)
             demo.load(self.load_db, inputs=None, outputs=[db, client])
@@ -362,7 +362,7 @@ class LocalChatGPT:
                     msg = gr.Textbox(
                         label="Отправить сообщение",
                         show_label=False,
-                        placeholder="Отправить сообщение",
+                        placeholder="👉 Напишите сообщение и нажмите ENTER",
                         container=False
                     )
                 with gr.Column(scale=3, min_width=100):
