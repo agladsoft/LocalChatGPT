@@ -7,6 +7,7 @@ import gradio as gr
 from re import Pattern
 from __init__ import *
 from llama_cpp import Llama
+from gradio.themes.utils import sizes
 from langchain.vectorstores import Chroma
 from typing import List, Tuple, Optional, Union
 from langchain.docstore.document import Document
@@ -271,7 +272,7 @@ class LocalChatGPT:
 
         :return:
         """
-        with gr.Blocks(title="Ruscon GPT", theme=gr.themes.Soft()) as demo:
+        with gr.Blocks(title="Ruscon GPT", theme=gr.themes.Soft(text_size=sizes.text_sm), css=BLOCK_CSS) as demo:
             db: gr.State = gr.State(None)
             client: gr.State = gr.State(None)
             demo.load(self.load_db, inputs=None, outputs=[db, client])

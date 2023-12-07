@@ -56,3 +56,12 @@ MAX_NEW_TOKENS: int = 1500
 ABS_PATH = os.path.dirname(os.path.abspath(__file__))
 DB_DIR = os.path.join(ABS_PATH, "db")
 AUTH_FILE = os.path.join(ABS_PATH, "auth.csv")
+
+
+BLOCK_CSS = """
+
+#buttons button {
+    min-width: min(120px,100%);
+}
+
+"""
