@@ -3,8 +3,6 @@ import chromadb
 import tempfile
 import itertools
 import gradio as gr
-import requests
-
 from __init__ import *
 from llama_cpp import Llama
 from langchain.vectorstores import Chroma
