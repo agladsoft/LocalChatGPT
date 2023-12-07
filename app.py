@@ -366,11 +366,11 @@ class LocalChatGPT:
                     submit = gr.Button("📤 Отправить")
 
             with gr.Row():
-                gr.Button(value="👍  Понравилось")
-                gr.Button(value="👎  Не понравилось")
+                gr.Button(value="👍 Понравилось")
+                gr.Button(value="👎 Не понравилось")
                 stop = gr.Button(value="⛔ Остановить")
-                regenerate = gr.Button(value="🔄  Повторить")
-                clear = gr.Button(value="🗑️  Очистить")
+                regenerate = gr.Button(value="🔄 Повторить")
+                clear = gr.Button(value="🗑️ Очистить")
 
             # Upload files
             file_output.upload(
