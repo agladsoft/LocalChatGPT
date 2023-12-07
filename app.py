@@ -16,6 +16,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 class LocalChatGPT:
     def __init__(self):
         self.llama_models, self.embeddings = self.initialize_app()
+        self.collection = "all-documents"
 
     @staticmethod
     def initialize_app() -> Tuple[List[Llama], HuggingFaceEmbeddings]:
@@ -156,7 +157,7 @@ class LocalChatGPT:
         is_updated, db, file_warning = self.update_text_db(db, fixed_documents, ids)
         if is_updated:
             return db, file_warning
-        db = client.get_collection(COLLECTION_NAME)
+        db = client.get_collection(self.collection)
         db.add(
             documents=[doc.page_content for doc in fixed_documents],
             metadatas=[doc.metadata for doc in fixed_documents],
@@ -246,19 +247,20 @@ class LocalChatGPT:
             history[-1][1] = partial_text
             yield history
 
-    @staticmethod
-    def load_db() -> Union[Chroma, chromadb.PersistentClient]:
+    def load_db(self) -> Union[Chroma, chromadb.PersistentClient]:
         client: chromadb.PersistentClient = chromadb.PersistentClient()
-        db: Collection = client.get_or_create_collection(COLLECTION_NAME)
+        db: Collection = client.get_or_create_collection(self.collection)
         return db, client
 
-    @staticmethod
-    def login(username: str, password: str) -> bool:
+    def login(self, username: str, password: str) -> bool:
         with open(AUTH_FILE) as f:
             file_data: csv.reader = csv.reader(f)
             headers: list[str] = next(file_data)
             users: list[dict[str, str]] = [dict(zip(headers, i)) for i in file_data]
-        return bool(list(filter(lambda user: user["username"] == username and user["password"] == password, users)))
+        user_from_db = list(filter(lambda user: user["username"] == username and user["password"] == password, users))
+        if user_from_db:
+            self.collection = user_from_db[0]["collection"]
+        return bool(user_from_db)
 
     def run(self):
         """
