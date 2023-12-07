@@ -330,29 +330,27 @@ class LocalChatGPT:
                     )
 
             with gr.Row():
-                with gr.Column(scale=3):
-                    file_output = gr.Files(file_count="multiple", label="Загрузка файлов")
-                    file_paths = gr.State([])
-                    file_warning = gr.Markdown("Фрагменты ещё не загружены!")
-
-            with gr.Row(elem_id="model_selector_row"):
-                model_selector = gr.Dropdown(
-                    choices=MODELS,
-                    value=MODELS[0] if len(MODELS) > 0 else "",
-                    interactive=True,
-                    show_label=False,
-                    container=False,
+                retrieved_docs = gr.Textbox(
+                    label="Извлеченные фрагменты",
+                    placeholder="Появятся после задавания вопросов",
+                    interactive=False
                 )
 
             with gr.Row():
-                with gr.Column(scale=5):
-                    chatbot = gr.Chatbot(label="Диалог", height=400)
-                with gr.Column(min_width=200, scale=4):
-                    retrieved_docs = gr.Textbox(
-                        label="Извлеченные фрагменты",
-                        placeholder="Появятся после задавания вопросов",
-                        interactive=False
-                    )
+                with gr.Column(scale=4):
+                    with gr.Row(elem_id="model_selector_row"):
+                        model_selector = gr.Dropdown(
+                            choices=MODELS,
+                            value=MODELS[0] if len(MODELS) > 0 else "",
+                            interactive=True,
+                            show_label=False,
+                            container=False,
+                        )
+                    file_output = gr.Files(file_count="multiple", label="Загрузка файлов")
+                    file_paths = gr.State([])
+                    file_warning = gr.Markdown("Фрагменты ещё не загружены!")
+                with gr.Column(scale=10):
+                    chatbot = gr.Chatbot(label="Диалог", height=500)
 
             with gr.Row():
                 with gr.Column(scale=20):
@@ -452,7 +450,7 @@ class LocalChatGPT:
             clear.click(lambda: None, None, chatbot, queue=False)
 
         demo.queue(max_size=128)
-        demo.launch(auth=self.login)
+        demo.launch(auth=self.login, share=True)
 
 
 if __name__ == "__main__":
