@@ -255,13 +255,13 @@ class LocalChatGPT:
 
         :return:
         """
-        with gr.Blocks(theme=gr.themes.Soft()) as demo:
+        with gr.Blocks(title="Ruscon GPT", theme=gr.themes.Soft()) as demo:
             db: gr.State = gr.State(None)
             client: gr.State = gr.State(None)
             demo.load(self.load_db, inputs=None, outputs=[db, client])
             favicon = f'<img src="{FAVICON_PATH}" width="48px" style="display: inline">'
             gr.Markdown(
-                f"""<h1><center>{favicon} Я Лисум, текстовый ассистент на основе GPT</center></h1>"""
+                f"""<h1><center>{favicon} Я, RetrievalQA - текстовый ассистент на основе GPT</center></h1>"""
             )
 
             with gr.Accordion("Параметры", open=False):

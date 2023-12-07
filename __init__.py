@@ -13,7 +13,7 @@ from langchain.document_loaders import (
 )
 
 
-FAVICON_PATH: str = 'https://space-course.ru/wp-content/uploads/2023/06/Fox_logo_512-2.png'
+FAVICON_PATH: str = 'https://freelogopng.com/images/all_img/1681038242chatgpt-logo-png.png'
 SYSTEM_PROMPT: str = "Ты — Сайга, русскоязычный автоматический ассистент. Ты разговариваешь с людьми и помогаешь им."
 SYSTEM_TOKEN: int = 1788
 USER_TOKEN: int = 1404
