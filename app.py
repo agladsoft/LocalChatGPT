@@ -3,6 +3,8 @@ import chromadb
 import tempfile
 import itertools
 import gradio as gr
+import requests
+
 from __init__ import *
 from llama_cpp import Llama
 from langchain.vectorstores import Chroma
@@ -253,7 +255,7 @@ class LocalChatGPT:
         return db, client
 
     @staticmethod
-    def authenticate(username: str, password: str) -> bool:
+    def login(username: str, password: str) -> bool:
         with open(AUTH_FILE) as f:
             file_data: csv.reader = csv.reader(f)
             headers: list[str] = next(file_data)
@@ -349,8 +351,7 @@ class LocalChatGPT:
                     retrieved_docs = gr.Textbox(
                         label="Извлеченные фрагменты",
                         placeholder="Появятся после задавания вопросов",
-                        interactive=False,
-                        height=400
+                        interactive=False
                     )
 
             with gr.Row():
@@ -450,8 +451,8 @@ class LocalChatGPT:
             # Clear history
             clear.click(lambda: None, None, chatbot, queue=False)
 
-        demo.queue(max_size=128, concurrency_count=1)
-        demo.launch(auth=self.authenticate)
+        demo.queue(max_size=128)
+        demo.launch(auth=self.login)
 
 
 if __name__ == "__main__":
