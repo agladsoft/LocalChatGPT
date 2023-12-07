@@ -1,16 +1,13 @@
-import contextlib
+import chromadb
 import tempfile
 import itertools
 import gradio as gr
-from chromadb.utils import embedding_functions
-from langchain.embeddings.sentence_transformer import SentenceTransformerEmbeddings
 from __init__ import *
 from llama_cpp import Llama
-from chromadb.config import Settings
 from langchain.vectorstores import Chroma
-import chromadb
 from typing import List, Tuple, Optional, Union
 from langchain.docstore.document import Document
+from chromadb.api.models.Collection import Collection
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
@@ -107,29 +104,25 @@ class LocalChatGPT:
         :param ids:
         :return:
         """
-        if db:
-            data: dict = db.get()
-            files_db = {dict_data['source'].split('/')[-1] for dict_data in data["metadatas"]}
-            files_load = {dict_data.metadata["source"].split('/')[-1] for dict_data in fixed_documents}
-            if files_load == files_db:
-                # db.delete([item for item in data['ids'] if item not in ids])
-                # db.update_documents(ids, fixed_documents)
-
-                db.delete(data['ids'])
-                db.add(
-                    documents=[doc.page_content for doc in fixed_documents],
-                    metadatas=[doc.metadata for doc in fixed_documents],
-                    ids=ids
-                )
-                file_warning = f"Загружено {len(fixed_documents)} фрагментов! Можно задавать вопросы."
-                return db, file_warning
-        else:
-            return None, "Фрагменты ещё не загружены!"
+        data: dict = db.get()
+        files_db = {dict_data['source'].split('/')[-1] for dict_data in data["metadatas"]}
+        files_load = {dict_data.metadata["source"].split('/')[-1] for dict_data in fixed_documents}
+        if files_load == files_db:
+            db.delete(data['ids'])
+            db.add(
+                documents=[doc.page_content for doc in fixed_documents],
+                metadatas=[doc.metadata for doc in fixed_documents],
+                ids=ids
+            )
+            file_warning = f"Загружено {len(fixed_documents)} фрагментов! Можно задавать вопросы."
+            return True, db, file_warning
+        return False, db, "Фрагменты ещё не загружены!"
 
     def build_index(
         self,
         file_paths: List[str],
         db: Optional[Chroma],
+        client: chromadb.PersistentClient,
         chunk_size: int,
         chunk_overlap: int
     ):
@@ -137,6 +130,7 @@ class LocalChatGPT:
 
         :param file_paths:
         :param db:
+        :param client:
         :param chunk_size:
         :param chunk_overlap:
         :return:
@@ -157,22 +151,16 @@ class LocalChatGPT:
             f"{path.split('/')[-1].replace('.txt', '')}{i}"
             for path, i in itertools.product(file_paths, range(1, len(fixed_documents) + 1))
         ]
-
-        db, file_warning = self.update_text_db(db, fixed_documents, ids)
-        client = chromadb.PersistentClient()
-        if not db:
-            with contextlib.suppress(ValueError):
-                db = client.get_collection("all-my-documents")
-                file_warning = f"Загружено {len(fixed_documents)} фрагментов! Можно задавать вопросы."
-                return db, file_warning
-        if not db:
-            db = client.create_collection("all-my-documents")
-            db.add(
-                documents=[doc.page_content for doc in fixed_documents],
-                metadatas=[doc.metadata for doc in fixed_documents],
-                ids=ids
-            )
-            file_warning = f"Загружено {len(fixed_documents)} фрагментов! Можно задавать вопросы."
+        is_updated, db, file_warning = self.update_text_db(db, fixed_documents, ids)
+        if is_updated:
+            return db, file_warning
+        db = client.get_collection(COLLECTION_NAME)
+        db.add(
+            documents=[doc.page_content for doc in fixed_documents],
+            metadatas=[doc.metadata for doc in fixed_documents],
+            ids=ids
+        )
+        file_warning = f"Загружено {len(fixed_documents)} фрагментов! Можно задавать вопросы."
         return db, file_warning
 
     @staticmethod
@@ -201,37 +189,13 @@ class LocalChatGPT:
         """
         if db:
             last_user_message = history[-1][0]
-            try:
-                # docs = db.similarity_search(last_user_message, k=k_documents)
-                docs = db.query(
-                    query_texts=[last_user_message],
-                    n_results=k_documents
-                )
-
-                # retriever = db.as_retriever(search_kwargs={"k": k_documents})
-                # docs = retriever.get_relevant_documents(last_user_message)
-            except RuntimeError:
-                # docs = db.similarity_search(last_user_message, k=1)
-                docs = db.query(
-                    query_texts=[last_user_message],
-                    n_results=1
-                )
-                # retriever = db.as_retriever(search_kwargs={"k": 1})
-                # docs = retriever.get_relevant_documents(last_user_message)
-
-            source_docs = set()
-            for doc in docs["metadatas"][0]:
-                source_docs.add(doc["source"].split("/")[-1])
-            retrieved_docs = "\n\n".join([doc for doc in docs["documents"][0]])
+            docs = db.query(
+                query_texts=[last_user_message],
+                n_results=k_documents
+            )
+            source_docs = {doc["source"].split("/")[-1] for doc in docs["metadatas"][0]}
+            retrieved_docs = "\n\n".join(list(docs["documents"][0]))
             retrieved_docs = f"Документ - {''.join(list(source_docs))}.\n\n{retrieved_docs}"
-
-
-            # source_docs = set()
-            # for doc in docs:
-            #     for content in doc.metadata.values():
-            #         source_docs.add(content.split("/")[-1])
-            # retrieved_docs = "\n\n".join([doc.page_content for doc in docs])
-            # retrieved_docs = f"Документ - {''.join(list(source_docs))}.\n\n{retrieved_docs}"
         return retrieved_docs
 
     def bot(self, history, retrieved_docs, top_p, top_k, temp, model_selector):
@@ -280,18 +244,21 @@ class LocalChatGPT:
             history[-1][1] = partial_text
             yield history
 
+    @staticmethod
+    def load_db() -> Union[Chroma, chromadb.PersistentClient]:
+        client: chromadb.PersistentClient = chromadb.PersistentClient()
+        db: Collection = client.get_or_create_collection(COLLECTION_NAME)
+        return db, client
+
     def run(self):
         """
 
         :return:
         """
         with gr.Blocks(theme=gr.themes.Soft()) as demo:
-            db: Optional[Chroma] = gr.State(None)
-            try:
-                client = chromadb.PersistentClient()
-                db = client.get_collection("all-my-documents")
-            except Exception:
-                pass
+            db: gr.State = gr.State(None)
+            client: gr.State = gr.State(None)
+            demo.load(self.load_db, inputs=None, outputs=[db, client])
             favicon = f'<img src="{FAVICON_PATH}" width="48px" style="display: inline">'
             gr.Markdown(
                 f"""<h1><center>{favicon} Я Лисум, текстовый ассистент на основе GPT</center></h1>"""
@@ -402,7 +369,7 @@ class LocalChatGPT:
                 queue=True,
             ).success(
                 fn=self.build_index,
-                inputs=[file_paths, db, chunk_size, chunk_overlap],
+                inputs=[file_paths, db, client, chunk_size, chunk_overlap],
                 outputs=[db, file_warning],
                 queue=True
             )

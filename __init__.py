@@ -55,3 +55,5 @@ MAX_NEW_TOKENS: int = 1500
 
 ABS_PATH = os.path.dirname(os.path.abspath(__file__))
 DB_DIR = os.path.join(ABS_PATH, "db")
+
+COLLECTION_NAME = "all-my-documents"
