@@ -1,8 +1,10 @@
+import re
 import csv
 import chromadb
 import tempfile
 import itertools
 import gradio as gr
+from re import Pattern
 from __init__ import *
 from llama_cpp import Llama
 from langchain.vectorstores import Chroma
@@ -109,9 +111,11 @@ class LocalChatGPT:
         data: dict = db.get()
         files_db = {dict_data['source'].split('/')[-1] for dict_data in data["metadatas"]}
         files_load = {dict_data.metadata["source"].split('/')[-1] for dict_data in fixed_documents}
-        if files_load == files_db:
-            gr.Warning("Файлы " + ", ".join(files_load) + " повторяются, поэтому они будут обновлены")
-            db.delete(data['ids'])
+        if same_files := files_load & files_db:
+            gr.Warning("Файлы " + ", ".join(same_files) + " повторяются, поэтому они будут обновлены")
+            for file in same_files:
+                pattern: Pattern[str] = re.compile(fr'{file.replace(".txt", "")}\d*$')
+                db.delete([x for x in data['ids'] if pattern.match(x)])
             db.add(
                 documents=[doc.page_content for doc in fixed_documents],
                 metadatas=[doc.metadata for doc in fixed_documents],
