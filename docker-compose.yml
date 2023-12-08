@@ -19,6 +19,7 @@ services:
   chroma:
     image: chromadb/chroma:0.4.18
     container_name: chroma
+    restart: always
     volumes:
       - ./chroma:/chroma/chroma
     environment:
