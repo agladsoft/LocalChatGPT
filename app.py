@@ -296,7 +296,7 @@ class LocalChatGPT:
 
         :return:
         """
-        with gr.Blocks(title="Ruscon GPT", theme=gr.themes.Soft(text_size=sizes.text_md), css=BLOCK_CSS) as demo:
+        with gr.Blocks(title="RusconGPT", theme=gr.themes.Soft(text_size=sizes.text_md), css=BLOCK_CSS) as demo:
             db: gr.State = gr.State(None)
             client: gr.State = gr.State(None)
             demo.load(self.load_db, inputs=None, outputs=[db, client])
