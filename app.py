@@ -194,7 +194,7 @@ class LocalChatGPT:
         return "", history
 
     @staticmethod
-    def retrieve(history, db: Optional[Chroma], retrieved_docs, k_documents):
+    def retrieve(history, db: Optional[Chroma], retrieved_docs: str, k_documents: int) -> str:
         """
 
         :param history:
@@ -209,9 +209,15 @@ class LocalChatGPT:
                 query_texts=[last_user_message],
                 n_results=k_documents
             )
-            source_docs = {doc["source"].split("/")[-1] for doc in docs["metadatas"][0]}
-            retrieved_docs = "\n\n".join(list(docs["documents"][0]))
-            retrieved_docs = f"Документ - {''.join(list(source_docs))}.\n\n{retrieved_docs}"
+            data: dict = {}
+            for doc, text in zip(docs["metadatas"][0], docs["documents"][0]):
+                document: str = f'Документ - {doc["source"].split("/")[-1]}'
+                if document in data:
+                    data[document] += "\n" + text
+                else:
+                    data[document] = text
+            list_data: list = [f"{doc}\n\n{text}" for doc, text in data.items()]
+            retrieved_docs = "\n\n\n".join(list_data)
         return retrieved_docs
 
     def bot(self, history, retrieved_docs, top_p, top_k, temp, model_selector):
@@ -261,11 +267,21 @@ class LocalChatGPT:
             yield history
 
     def load_db(self) -> Union[Chroma, chromadb.HttpClient]:
+        """
+
+        :return:
+        """
         client: chromadb.HttpClient = chromadb.HttpClient(host='localhost', port="8000")
         db: Collection = client.get_or_create_collection(self.collection)
         return db, client
 
     def login(self, username: str, password: str) -> bool:
+        """
+
+        :param username:
+        :param password:
+        :return:
+        """
         with open(AUTH_FILE) as f:
             file_data: csv.reader = csv.reader(f)
             headers: list[str] = next(file_data)
