@@ -130,7 +130,7 @@ class LocalChatGPT:
         self,
         file_paths: List[str],
         db: Optional[Chroma],
-        client: chromadb.PersistentClient,
+        client: chromadb.HttpClient,
         chunk_size: int,
         chunk_overlap: int
     ):
@@ -252,8 +252,8 @@ class LocalChatGPT:
             history[-1][1] = partial_text
             yield history
 
-    def load_db(self) -> Union[Chroma, chromadb.PersistentClient]:
-        client: chromadb.PersistentClient = chromadb.PersistentClient()
+    def load_db(self) -> Union[Chroma, chromadb.HttpClient]:
+        client: chromadb.HttpClient = chromadb.HttpClient(host='localhost', port="8000")
         db: Collection = client.get_or_create_collection(self.collection)
         return db, client
 
