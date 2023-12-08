@@ -309,7 +309,7 @@ class LocalChatGPT:
                 with gr.Tab(label="Параметры извлечения фрагментов из текста"):
                     k_documents = gr.Slider(
                         minimum=1,
-                        maximum=10,
+                        maximum=20,
                         value=4,
                         step=1,
                         interactive=True,
