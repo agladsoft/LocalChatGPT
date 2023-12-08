@@ -7,7 +7,6 @@ services:
     ports:
       - "8123:8123"
       - "9000:9000"
-    user: "1000"
     volumes:
       - ./clickhouse:/bitnami/clickhouse
     environment:
@@ -27,7 +26,6 @@ services:
       - CLICKHOUSE_PORT=8123
     ports:
       - "8000:8000"
-    user: "1000"
     depends_on:
       - clickhouse
     networks:
