@@ -11,6 +11,7 @@ from gradio.themes.utils import sizes
 from langchain.vectorstores import Chroma
 from typing import List, Tuple, Optional, Union
 from langchain.docstore.document import Document
+from huggingface_hub.file_download import http_get
 from chromadb.api.models.Collection import Collection
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -28,10 +29,17 @@ class LocalChatGPT:
         :return:
         """
         llama_models: list = []
-        for model in MODELS:
-            os.makedirs(model.split("/")[0], exist_ok=True)
+        os.makedirs(MODELS_DIR, exist_ok=True)
+        for model_url, model_name in list(DICT_REPO_AND_MODELS.items()):
+            final_model_path = os.path.join(MODELS_DIR, model_name)
+            os.makedirs("/".join(final_model_path.split("/")[:-1]), exist_ok=True)
+
+            if not os.path.exists(final_model_path):
+                with open(final_model_path, "wb") as f:
+                    http_get(model_url, f)
+
             llama_models.append(Llama(
-                model_path=model,
+                model_path=final_model_path,
                 n_ctx=2000,
                 n_parts=1,
             ))
@@ -344,9 +352,10 @@ class LocalChatGPT:
             with gr.Row():
                 with gr.Column(scale=4):
                     with gr.Row(elem_id="model_selector_row"):
+                        models: list = list(DICT_REPO_AND_MODELS.values())
                         model_selector = gr.Dropdown(
-                            choices=MODELS,
-                            value=MODELS[0] if len(MODELS) > 0 else "",
+                            choices=models,
+                            value=models[0] if models else "",
                             interactive=True,
                             show_label=False,
                             container=False,

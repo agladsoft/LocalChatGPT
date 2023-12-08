@@ -42,12 +42,17 @@ LOADER_MAPPING: dict = {
 }
 
 
-MODELS: list = [
-    "saiga2_7b_gguf/model-q2_K.gguf",
-    # "saiga2_7b_gguf/model-q4_K.gguf",
-    # "llama2_7b_gguf/llama-2-7b-chat.Q2_K.gguf",
-    # "openbuddy_llama2_13b_gguf/openbuddy-llama2-13b-v11.1.Q2_K.gguf"
-]
+DICT_REPO_AND_MODELS: dict = {
+    "https://huggingface.co/IlyaGusev/saiga2_7b_gguf/resolve/main/model-q2_K.gguf":
+        "saiga2_7b_gguf/model-q2_K.gguf",
+    "https://huggingface.co/IlyaGusev/saiga2_7b_gguf/resolve/main/model-q4_K.gguf":
+        "saiga2_7b_gguf/model-q4_K.gguf",
+    "https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q2_K.gguf":
+        "llama-2-7b-chat.Q2_K.gguf",
+    "https://huggingface.co/TheBloke/OpenBuddy-Llama2-13B-v11.1-GGUF/resolve/main/openbuddy-llama2-13b-v11.1.Q2_K.gguf":
+        "openbuddy-llama2-13b-v11.1.Q2_K.gguf",
+}
+
 
 EMBEDDER_NAME: str = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
 
@@ -55,6 +60,7 @@ MAX_NEW_TOKENS: int = 1500
 
 ABS_PATH = os.path.dirname(os.path.abspath(__file__))
 DB_DIR = os.path.join(ABS_PATH, "db")
+MODELS_DIR = os.path.join(ABS_PATH, "models")
 AUTH_FILE = os.path.join(ABS_PATH, "auth.csv")
 
 
