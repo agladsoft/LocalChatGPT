@@ -214,11 +214,11 @@ class LocalChatGPT:
         :param chunk_overlap:
         :return:
         """
-        documents: List[Document] = [self.load_single_document(path) for path in file_paths]
+        load_documents: List[Document] = [self.load_single_document(path) for path in file_paths]
         text_splitter: CustomRecursiveCharacterTextSplitter = CustomRecursiveCharacterTextSplitter(
             # chunk_size=chunk_size, chunk_overlap=chunk_overlap
         )
-        documents = text_splitter.split_documents(documents)
+        documents = text_splitter.split_documents(load_documents)
         fixed_documents: List[Document] = []
         for doc in documents:
             doc.page_content = self.process_text(doc.page_content)
@@ -227,8 +227,8 @@ class LocalChatGPT:
             fixed_documents.append(doc)
 
         ids: List[str] = [
-            f"{path.split('/')[-1].replace('.txt', '')}{i}"
-            for path, i in itertools.product(file_paths, range(1, len(fixed_documents) + 1))
+            f"{doc.metadata['source'].split('/')[-1].replace('.txt', '')}{i}"
+            for i, doc in enumerate(fixed_documents)
         ]
         is_updated, db, file_warning = self.update_text_db(db, fixed_documents, ids)
         if is_updated:
