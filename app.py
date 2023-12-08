@@ -2,7 +2,6 @@ import re
 import csv
 import chromadb
 import tempfile
-import itertools
 import gradio as gr
 from re import Pattern
 from __init__ import *
