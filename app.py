@@ -449,7 +449,7 @@ class LocalChatGPT:
                     msg = gr.Textbox(
                         label="Отправить сообщение",
                         show_label=False,
-                        placeholder="👉 Напишите сообщение и нажмите ENTER",
+                        placeholder="👉 Напишите запрос",
                         container=False
                     )
                 with gr.Column(scale=3, min_width=100):
