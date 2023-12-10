@@ -1,5 +1,4 @@
 import os
-from transformers import pipeline
 from langchain.document_loaders import (
     CSVLoader,
     EverNoteLoader,
@@ -60,9 +59,6 @@ DICT_REPO_AND_MODELS: dict = {
 
 
 EMBEDDER_NAME: str = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
-
-MODEL_ID = "sanchit-gandhi/whisper-small-dv"  # update with your model id
-pipe = pipeline("automatic-speech-recognition", model=MODEL_ID)
 
 MAX_NEW_TOKENS: int = 1500
 
