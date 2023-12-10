@@ -1,5 +1,7 @@
 import re
 import csv
+import time
+
 import chromadb
 import tempfile
 import gradio as gr
@@ -126,6 +128,7 @@ class LocalChatGPT:
             n_ctx=2000,
             n_parts=1,
         )
+        time.sleep(15)
 
     @staticmethod
     def load_single_document(file_path: str) -> Document:
@@ -454,10 +457,6 @@ class LocalChatGPT:
                             show_label=False,
                             container=False,
                         )
-                        model_selector.change(
-                            fn=self.load_model,
-                            inputs=[model_selector]
-                        )
                     file_output = gr.Files(file_count="multiple", label="Загрузка файлов")
                     file_paths = gr.State([])
                     file_warning = gr.Markdown("Фрагменты ещё не загружены!")
@@ -481,6 +480,11 @@ class LocalChatGPT:
                 stop = gr.Button(value="⛔ Остановить")
                 regenerate = gr.Button(value="🔄 Повторить")
                 clear = gr.Button(value="🗑️ Очистить")
+
+            model_selector.change(
+                fn=self.load_model,
+                inputs=[model_selector]
+            )
 
             # Upload files
             file_output.upload(
