@@ -128,7 +128,7 @@ class LocalChatGPT:
             n_ctx=2000,
             n_parts=1,
         )
-        time.sleep(15)
+        return model_name
 
     @staticmethod
     def load_single_document(file_path: str) -> Document:
@@ -483,7 +483,8 @@ class LocalChatGPT:
 
             model_selector.change(
                 fn=self.load_model,
-                inputs=[model_selector]
+                inputs=[model_selector],
+                outputs=[model_selector]
             )
 
             # Upload files
