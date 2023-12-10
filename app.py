@@ -7,8 +7,8 @@ from re import Pattern
 from __init__ import *
 from llama_cpp import Llama
 from gradio.themes.utils import sizes
+from typing import List, Optional, Union
 from langchain.vectorstores import Chroma
-from typing import List, Tuple, Optional, Union
 from langchain.docstore.document import Document
 from huggingface_hub.file_download import http_get
 from chromadb.api.models.Collection import Collection
@@ -81,32 +81,51 @@ class CustomRecursiveCharacterTextSplitter(RecursiveCharacterTextSplitter):
 
 class LocalChatGPT:
     def __init__(self):
-        self.llama_models, self.embeddings = self.initialize_app()
-        self.collection = "all-documents"
+        self.llama_model: Optional[Llama] = None
+        self.embeddings: HuggingFaceEmbeddings = self.initialize_app()
+        self.collection: str = "all-documents"
 
-    @staticmethod
-    def initialize_app() -> Tuple[List[Llama], HuggingFaceEmbeddings]:
+    def initialize_app(self) -> HuggingFaceEmbeddings:
         """
         Загружаем все модели из списка.
         :return:
         """
-        llama_models: list = []
         os.makedirs(MODELS_DIR, exist_ok=True)
-        for model_url, model_name in list(DICT_REPO_AND_MODELS.items()):
-            final_model_path = os.path.join(MODELS_DIR, model_name)
-            os.makedirs("/".join(final_model_path.split("/")[:-1]), exist_ok=True)
+        model_url, model_name = list(DICT_REPO_AND_MODELS.items())[0]
+        final_model_path = os.path.join(MODELS_DIR, model_name)
+        os.makedirs("/".join(final_model_path.split("/")[:-1]), exist_ok=True)
 
-            if not os.path.exists(final_model_path):
-                with open(final_model_path, "wb") as f:
-                    http_get(model_url, f)
+        if not os.path.exists(final_model_path):
+            with open(final_model_path, "wb") as f:
+                http_get(model_url, f)
 
-            llama_models.append(Llama(
-                model_path=final_model_path,
-                n_ctx=2000,
-                n_parts=1,
-            ))
+        self.llama_model = Llama(
+            model_path=final_model_path,
+            n_ctx=2000,
+            n_parts=1,
+        )
 
-        return llama_models, HuggingFaceEmbeddings(model_name=EMBEDDER_NAME)
+        return HuggingFaceEmbeddings(model_name=EMBEDDER_NAME)
+
+    def load_model(self, model_name):
+        """
+
+        :param model_name:
+        :return:
+        """
+        final_model_path = os.path.join(MODELS_DIR, model_name)
+        os.makedirs("/".join(final_model_path.split("/")[:-1]), exist_ok=True)
+
+        if not os.path.exists(final_model_path):
+            with open(final_model_path, "wb") as f:
+                if model_url := [i for i in DICT_REPO_AND_MODELS if DICT_REPO_AND_MODELS[i] == model_name]:
+                    http_get(model_url[0], f)
+
+        self.llama_model = Llama(
+            model_path=final_model_path,
+            n_ctx=2000,
+            n_parts=1,
+        )
 
     @staticmethod
     def load_single_document(file_path: str) -> Document:
@@ -282,7 +301,7 @@ class LocalChatGPT:
             retrieved_docs = "\n\n\n".join(list_data)
         return retrieved_docs
 
-    def bot(self, history, retrieved_docs, top_p, top_k, temp, model_selector):
+    def bot(self, history, retrieved_docs, top_p, top_k, temp):
         """
 
         :param history:
@@ -290,30 +309,27 @@ class LocalChatGPT:
         :param top_p:
         :param top_k:
         :param temp:
-        :param model_selector:
         :return:
         """
         if not history:
             return
-        model = next((model for model in self.llama_models if model_selector in model.model_path), None)
-
-        tokens = self.get_system_tokens(model)[:]
+        tokens = self.get_system_tokens(self.llama_model)[:]
         tokens.append(LINEBREAK_TOKEN)
 
         for user_message, bot_message in history[:-1]:
-            message_tokens = self.get_message_tokens(model=model, role="user", content=user_message)
+            message_tokens = self.get_message_tokens(model=self.llama_model, role="user", content=user_message)
             tokens.extend(message_tokens)
 
         last_user_message = history[-1][0]
         if retrieved_docs:
             last_user_message = f"Контекст: {retrieved_docs}\n\nИспользуя контекст, ответь на вопрос: " \
                                 f"{last_user_message}"
-        message_tokens = self.get_message_tokens(model=model, role="user", content=last_user_message)
+        message_tokens = self.get_message_tokens(model=self.llama_model, role="user", content=last_user_message)
         tokens.extend(message_tokens)
 
-        role_tokens = [model.token_bos(), BOT_TOKEN, LINEBREAK_TOKEN]
+        role_tokens = [self.llama_model.token_bos(), BOT_TOKEN, LINEBREAK_TOKEN]
         tokens.extend(role_tokens)
-        generator = model.generate(
+        generator = self.llama_model.generate(
             tokens,
             top_k=top_k,
             top_p=top_p,
@@ -322,9 +338,9 @@ class LocalChatGPT:
 
         partial_text = ""
         for i, token in enumerate(generator):
-            if token == model.token_eos() or (MAX_NEW_TOKENS is not None and i >= MAX_NEW_TOKENS):
+            if token == self.llama_model.token_eos() or (MAX_NEW_TOKENS is not None and i >= MAX_NEW_TOKENS):
                 break
-            partial_text += model.detokenize([token]).decode("utf-8", "ignore")
+            partial_text += self.llama_model.detokenize([token]).decode("utf-8", "ignore")
             history[-1][1] = partial_text
             yield history
 
@@ -438,6 +454,10 @@ class LocalChatGPT:
                             show_label=False,
                             container=False,
                         )
+                        model_selector.change(
+                            fn=self.load_model,
+                            inputs=[model_selector]
+                        )
                     file_output = gr.Files(file_count="multiple", label="Загрузка файлов")
                     file_paths = gr.State([])
                     file_warning = gr.Markdown("Фрагменты ещё не загружены!")
@@ -488,7 +508,7 @@ class LocalChatGPT:
                 queue=True,
             ).success(
                 fn=self.bot,
-                inputs=[chatbot, retrieved_docs, top_p, top_k, temp, model_selector],
+                inputs=[chatbot, retrieved_docs, top_p, top_k, temp],
                 outputs=chatbot,
                 queue=True,
             )
@@ -506,7 +526,7 @@ class LocalChatGPT:
                 queue=True,
             ).success(
                 fn=self.bot,
-                inputs=[chatbot, retrieved_docs, top_p, top_k, temp, model_selector],
+                inputs=[chatbot, retrieved_docs, top_p, top_k, temp],
                 outputs=chatbot,
                 queue=True,
             )
@@ -533,7 +553,7 @@ class LocalChatGPT:
                 queue=True,
             ).success(
                 fn=self.bot,
-                inputs=[chatbot, retrieved_docs, top_p, top_k, temp, model_selector],
+                inputs=[chatbot, retrieved_docs, top_p, top_k, temp],
                 outputs=chatbot,
                 queue=True,
             )
