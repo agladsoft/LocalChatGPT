@@ -502,7 +502,7 @@ class LocalChatGPT:
             clear.click(lambda: None, None, chatbot, queue=False)
 
         demo.queue(max_size=128)
-        demo.launch(auth=self.login, share=True)
+        demo.launch(auth=self.login, share=True, server_name="0.0.0.0")
 
 
 if __name__ == "__main__":
