@@ -326,7 +326,7 @@ class LocalChatGPT:
                     k_documents = gr.Slider(
                         minimum=1,
                         maximum=20,
-                        value=4,
+                        value=10,
                         step=1,
                         interactive=True,
                         label="Кол-во фрагментов для контекста"
@@ -335,7 +335,7 @@ class LocalChatGPT:
                     chunk_size = gr.Slider(
                         minimum=50,
                         maximum=2000,
-                        value=250,
+                        value=1000,
                         step=50,
                         interactive=True,
                         label="Размер фрагментов",
