@@ -13,7 +13,7 @@ from langchain.document_loaders import (
 )
 
 
-FAVICON_PATH: str = 'https://freelogopng.com/images/all_img/1681038242chatgpt-logo-png.png'
+FAVICON_PATH: str = 'file/sclogo1.png'
 SYSTEM_PROMPT: str = "Ты — Сайга, русскоязычный автоматический ассистент. Ты разговариваешь с людьми и помогаешь им."
 SYSTEM_TOKEN: int = 1788
 USER_TOKEN: int = 1404
@@ -53,8 +53,8 @@ DICT_REPO_AND_MODELS: dict = {
     #     "saiga2_13b_gguf/model-q4_K.gguf",
     # "https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q2_K.gguf":
     #     "llama-2-7b-chat.Q2_K.gguf",
-    # "https://huggingface.co/TheBloke/OpenBuddy-Llama2-13B-v11.1-GGUF/resolve/main/openbuddy-llama2-13b-v11.1.Q2_K.gguf":
-    #     "openbuddy-llama2-13b-v11.1.Q2_K.gguf",
+    "https://huggingface.co/TheBloke/OpenBuddy-Llama2-13B-v11.1-GGUF/resolve/main/openbuddy-llama2-13b-v11.1.Q2_K.gguf":
+        "openbuddy-llama2-13b-v11.1.Q2_K.gguf",
 }
 
 
