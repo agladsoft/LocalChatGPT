@@ -11,7 +11,6 @@ from typing import List, Optional, Union
 from langchain.vectorstores import Chroma
 from langchain.docstore.document import Document
 from huggingface_hub.file_download import http_get
-from chromadb.api.models.Collection import Collection
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
@@ -157,7 +156,6 @@ class LocalChatGPT:
         self,
         file_paths: List[str],
         db: Optional[Chroma],
-        client: chromadb.HttpClient,
         chunk_size: int,
         chunk_overlap: int
     ):
@@ -165,7 +163,6 @@ class LocalChatGPT:
 
         :param file_paths:
         :param db:
-        :param client:
         :param chunk_size:
         :param chunk_overlap:
         :return:
@@ -189,11 +186,12 @@ class LocalChatGPT:
         is_updated, db, file_warning = self.update_text_db(db, fixed_documents, ids)
         if is_updated:
             return db, file_warning
-        db = client.get_collection(self.collection)
-        db.add(
-            documents=[doc.page_content for doc in fixed_documents],
-            metadatas=[doc.metadata for doc in fixed_documents],
-            ids=ids
+        db = db.from_documents(
+            documents=fixed_documents,
+            embedding=self.embeddings,
+            ids=ids,
+            persist_directory="./chroma",
+            collection_name=self.collection,
         )
         file_warning = f"Загружено {len(fixed_documents)} фрагментов! Можно задавать вопросы."
         return db, file_warning
@@ -224,17 +222,14 @@ class LocalChatGPT:
         """
         if db:
             last_user_message = history[-1][0]
-            docs = db.query(
-                query_texts=[last_user_message],
-                n_results=k_documents
-            )
+            docs = db.similarity_search(last_user_message)
             data: dict = {}
-            for doc, text in zip(docs["metadatas"][0], docs["documents"][0]):
-                document: str = f'Документ - {doc["source"].split("/")[-1]}'
+            for doc in docs:
+                document: str = f'Документ - {doc.metadata["source"].split("/")[-1]}'
                 if document in data:
-                    data[document] += "\n" + text
+                    data[document] += "\n" + doc.page_content
                 else:
-                    data[document] = text
+                    data[document] = doc.page_content
             list_data: list = [f"{doc}\n\n{text}" for doc, text in data.items()]
             retrieved_docs = "\n\n\n".join(list_data)
         return retrieved_docs
@@ -287,9 +282,12 @@ class LocalChatGPT:
 
         :return:
         """
-        client: chromadb.HttpClient = chromadb.HttpClient(host='localhost', port="8000")
-        db: Collection = client.get_or_create_collection(self.collection)
-        return db, client
+        client = chromadb.PersistentClient(path="./chroma")
+        return Chroma(
+            client=client,
+            collection_name=self.collection,
+            embedding_function=self.embeddings,
+        )
 
     def login(self, username: str, password: str) -> bool:
         """
@@ -314,8 +312,7 @@ class LocalChatGPT:
         """
         with gr.Blocks(title="RusconGPT", theme=gr.themes.Soft(text_size=sizes.text_md), css=BLOCK_CSS) as demo:
             db: gr.State = gr.State(None)
-            client: gr.State = gr.State(None)
-            demo.load(self.load_db, inputs=None, outputs=[db, client])
+            demo.load(self.load_db, inputs=None, outputs=[db])
             favicon = f'<img src="{FAVICON_PATH}" width="48px" style="display: inline">'
             gr.Markdown(
                 f"""<h1><center>{favicon} Я, Макар - текстовый ассистент на основе GPT</center></h1>"""
@@ -326,7 +323,7 @@ class LocalChatGPT:
                     k_documents = gr.Slider(
                         minimum=1,
                         maximum=20,
-                        value=10,
+                        value=40,
                         step=1,
                         interactive=True,
                         label="Кол-во фрагментов для контекста"
@@ -430,7 +427,7 @@ class LocalChatGPT:
                 queue=True,
             ).success(
                 fn=self.build_index,
-                inputs=[file_paths, db, client, chunk_size, chunk_overlap],
+                inputs=[file_paths, db, chunk_size, chunk_overlap],
                 outputs=[db, file_warning],
                 queue=True
             )
@@ -502,7 +499,7 @@ class LocalChatGPT:
             clear.click(lambda: None, None, chatbot, queue=False)
 
         demo.queue(max_size=128)
-        demo.launch(auth=self.login, share=True, server_name="0.0.0.0")
+        demo.launch(auth=self.login, server_name="0.0.0.0")
 
 
 if __name__ == "__main__":
