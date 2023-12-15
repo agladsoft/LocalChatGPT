@@ -41,7 +41,7 @@ class LocalChatGPT:
             n_parts=1,
         )
 
-        return HuggingFaceEmbeddings(model_name=EMBEDDER_NAME)
+        return HuggingFaceEmbeddings(model_name=EMBEDDER_NAME, cache_folder=MODELS_DIR)
 
     def load_model(self, model_name):
         """
@@ -122,8 +122,8 @@ class LocalChatGPT:
         text = "\n".join(lines).strip()
         return None if len(text) < 10 else text
 
-    @staticmethod
     def update_text_db(
+        self,
         db: Optional[Chroma],
         fixed_documents: List[Document],
         ids: List[str]
@@ -143,10 +143,12 @@ class LocalChatGPT:
             for file in same_files:
                 pattern: Pattern[str] = re.compile(fr'{file.replace(".txt", "")}\d*$')
                 db.delete([x for x in data['ids'] if pattern.match(x)])
-            db.add(
-                documents=[doc.page_content for doc in fixed_documents],
-                metadatas=[doc.metadata for doc in fixed_documents],
-                ids=ids
+            db = db.from_documents(
+                documents=fixed_documents,
+                embedding=self.embeddings,
+                ids=ids,
+                persist_directory="./chroma",
+                collection_name=self.collection,
             )
             file_warning = f"Загружено {len(fixed_documents)} фрагментов! Можно задавать вопросы."
             return True, db, file_warning
@@ -323,7 +325,7 @@ class LocalChatGPT:
                     k_documents = gr.Slider(
                         minimum=1,
                         maximum=20,
-                        value=40,
+                        value=20,
                         step=1,
                         interactive=True,
                         label="Кол-во фрагментов для контекста"
@@ -498,8 +500,8 @@ class LocalChatGPT:
             # Clear history
             clear.click(lambda: None, None, chatbot, queue=False)
 
-        demo.queue(max_size=128)
-        demo.launch(auth=self.login, server_name="0.0.0.0")
+        demo.queue(max_size=128, default_concurrency_limit=10, api_open=False)
+        demo.launch(auth=self.login, server_name="0.0.0.0", max_threads=200)
 
 
 if __name__ == "__main__":
