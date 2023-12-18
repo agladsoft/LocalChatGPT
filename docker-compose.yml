@@ -1,5 +1,16 @@
 version: '3.9'
 services:
+  chatbot:
+    container_name: chatbot
+    build: .
+    restart: always
+    volumes:
+      - ./models:/app/models  # Монтируйте папку с моделями внутрь контейнера
+    ports:
+      - "7860:7860"
+    networks:
+      - db
+
   clickhouse:
     image: bitnami/clickhouse:22.11.2
     container_name: clickhouse
