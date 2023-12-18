@@ -1,6 +1,8 @@
 # Используйте базовый образ с поддержкой Python
 FROM python:3.10
 
+# Обновляем пакеты и устанавливаем libreoffice
+RUN apt update -y && apt upgrade -y && apt install libreoffice
 # Создайте директорию для приложения
 RUN mkdir /app
 WORKDIR /app
