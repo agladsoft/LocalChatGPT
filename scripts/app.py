@@ -224,7 +224,7 @@ class LocalChatGPT:
         """
         if db:
             last_user_message = history[-1][0]
-            docs = db.similarity_search(last_user_message)
+            docs = db.similarity_search(last_user_message, k_documents)
             data: dict = {}
             for doc in docs:
                 document: str = f'Документ - {doc.metadata["source"].split("/")[-1]}'
@@ -324,8 +324,8 @@ class LocalChatGPT:
                 with gr.Tab(label="Параметры извлечения фрагментов из текста"):
                     k_documents = gr.Slider(
                         minimum=1,
-                        maximum=20,
-                        value=20,
+                        maximum=10,
+                        value=4,
                         step=1,
                         interactive=True,
                         label="Кол-во фрагментов для контекста"
