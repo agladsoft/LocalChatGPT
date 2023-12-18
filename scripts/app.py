@@ -284,7 +284,7 @@ class LocalChatGPT:
 
         :return:
         """
-        client = chromadb.PersistentClient(path="../chroma")
+        client = chromadb.PersistentClient()
         return Chroma(
             client=client,
             collection_name=self.collection,

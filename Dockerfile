@@ -4,7 +4,7 @@ FROM python:3.10
 # Обновляем пакеты и устанавливаем libreoffice
 RUN apt update -y && apt upgrade -y && apt install libreoffice -y
 # Создайте директорию для приложения
-RUN mkdir /app
+RUN mkdir /app && mkdir /app/chroma
 WORKDIR /app
 
 # Копируйте файлы зависимостей (если есть) и другие необходимые файлы
