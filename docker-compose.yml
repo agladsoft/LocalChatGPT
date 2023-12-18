@@ -12,7 +12,7 @@ services:
       - db
 
   clickhouse:
-    image: bitnami/clickhouse:22.11.2
+    image: clickhouse/clickhouse-server:23.4.2.11
     container_name: clickhouse
     restart: always
     ports:
@@ -28,7 +28,7 @@ services:
       - db
 
   chroma:
-    image: chromadb/chroma:0.4.18
+    image: chromadb/chroma:0.4.15
     container_name: chroma
     restart: always
     volumes:

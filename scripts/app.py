@@ -284,7 +284,7 @@ class LocalChatGPT:
 
         :return:
         """
-        client = chromadb.PersistentClient(path="../chroma")
+        client = chromadb.Client()
         return Chroma(
             client=client,
             collection_name=self.collection,
@@ -500,8 +500,8 @@ class LocalChatGPT:
             # Clear history
             clear.click(lambda: None, None, chatbot, queue=False)
 
-        demo.queue(max_size=128, default_concurrency_limit=10, api_open=False)
-        demo.launch(auth=self.login, server_name="0.0.0.0", max_threads=200)
+        demo.queue(max_size=128, api_open=False)
+        demo.launch(server_name="0.0.0.0", max_threads=200)
 
 
 if __name__ == "__main__":
