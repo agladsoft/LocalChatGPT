@@ -147,7 +147,7 @@ class LocalChatGPT:
                 documents=fixed_documents,
                 embedding=self.embeddings,
                 ids=ids,
-                persist_directory="./chroma",
+                persist_directory=DB_DIR,
                 collection_name=self.collection,
             )
             file_warning = f"Загружено {len(fixed_documents)} фрагментов! Можно задавать вопросы."
@@ -192,7 +192,7 @@ class LocalChatGPT:
             documents=fixed_documents,
             embedding=self.embeddings,
             ids=ids,
-            persist_directory="./chroma",
+            persist_directory=DB_DIR,
             collection_name=self.collection,
         )
         file_warning = f"Загружено {len(fixed_documents)} фрагментов! Можно задавать вопросы."
@@ -284,7 +284,7 @@ class LocalChatGPT:
 
         :return:
         """
-        client = chromadb.PersistentClient(path="../chroma")
+        client = chromadb.PersistentClient(path=DB_DIR)
         return Chroma(
             client=client,
             collection_name=self.collection,

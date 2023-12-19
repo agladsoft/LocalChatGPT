@@ -59,8 +59,8 @@ EMBEDDER_NAME: str = "sentence-transformers/paraphrase-multilingual-mpnet-base-v
 MAX_NEW_TOKENS: int = 1500
 
 ABS_PATH = os.path.dirname(os.path.abspath(__file__))
-
-MODELS_DIR = os.path.join(ABS_PATH, "models")
+DB_DIR = os.path.join(ABS_PATH, "../chroma")
+MODELS_DIR = os.path.join(ABS_PATH, "../models")
 AUTH_FILE = os.path.join(ABS_PATH, "auth.csv")
 
 

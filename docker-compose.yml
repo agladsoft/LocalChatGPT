@@ -5,8 +5,9 @@ services:
     build: .
     restart: always
     volumes:
-      - ./models:/app/models  # Монтируйте папку с моделями внутрь контейнера
-      - ./chroma:/app/chroma
+      - ./models:/models  # Монтируйте папку с моделями внутрь контейнера
+      - ./chroma:/chroma
+      - ./scripts:/app
     ports:
       - "7860:7860"
     networks:
