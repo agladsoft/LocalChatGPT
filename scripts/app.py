@@ -284,7 +284,7 @@ class LocalChatGPT:
 
         :return:
         """
-        client = chromadb.PersistentClient()
+        client = chromadb.PersistentClient(path="../chroma")
         return Chroma(
             client=client,
             collection_name=self.collection,
@@ -333,8 +333,8 @@ class LocalChatGPT:
                 with gr.Tab(label="Параметры нарезки"):
                     chunk_size = gr.Slider(
                         minimum=50,
-                        maximum=2000,
-                        value=1000,
+                        maximum=1000,
+                        value=512,
                         step=50,
                         interactive=True,
                         label="Размер фрагментов",
@@ -439,7 +439,7 @@ class LocalChatGPT:
                 fn=self.user,
                 inputs=[msg, chatbot],
                 outputs=[msg, chatbot],
-                queue=False,
+                queue=True,
             ).success(
                 fn=self.retrieve,
                 inputs=[chatbot, db, retrieved_docs, k_documents],
@@ -457,7 +457,7 @@ class LocalChatGPT:
                 fn=self.user,
                 inputs=[msg, chatbot],
                 outputs=[msg, chatbot],
-                queue=False,
+                queue=True,
             ).success(
                 fn=self.retrieve,
                 inputs=[chatbot, db, retrieved_docs, k_documents],
@@ -476,7 +476,7 @@ class LocalChatGPT:
                 inputs=None,
                 outputs=None,
                 cancels=[submit_event, submit_click_event],
-                queue=False,
+                queue=True,
             )
 
             # Regenerate
@@ -500,7 +500,7 @@ class LocalChatGPT:
             # Clear history
             clear.click(lambda: None, None, chatbot, queue=False)
 
-        demo.queue(max_size=128, api_open=False)
+        demo.queue(max_size=128, default_concurrency_limit=10, api_open=False)
         demo.launch(server_name="0.0.0.0", max_threads=200)
 
 
