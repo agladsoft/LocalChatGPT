@@ -410,7 +410,7 @@ class LocalChatGPT:
                     collection_radio = gr.Radio(
                         choices=self.allowed_actions,
                         value=self.allowed_actions[0],
-                        label="Действие",
+                        label="Коллекции",
                         info="Переключение между выбором коллекций. Нужен ли контекст или нет?"
                     )
                     collection_radio.change(
