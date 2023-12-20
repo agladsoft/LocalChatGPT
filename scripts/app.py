@@ -20,6 +20,7 @@ class LocalChatGPT:
         self.llama_model: Optional[Llama] = None
         self.embeddings: HuggingFaceEmbeddings = self.initialize_app()
         self.collection: str = "all-documents"
+        self.allowed_actions: list = ["С контекстом", "Без контекста"]
 
     def initialize_app(self) -> HuggingFaceEmbeddings:
         """
@@ -212,17 +213,16 @@ class LocalChatGPT:
         """
         return "", history
 
-    @staticmethod
-    def retrieve(history, db: Optional[Chroma], retrieved_docs: str, k_documents: int) -> str:
+    def retrieve(self, history, db: Optional[Chroma], collection_radio, k_documents: int) -> str:
         """
 
         :param history:
         :param db:
-        :param retrieved_docs:
+        :param collection_radio:
         :param k_documents:
         :return:
         """
-        if db:
+        if db and collection_radio == self.allowed_actions[0]:
             last_user_message = history[-1][0]
             docs = db.similarity_search(last_user_message, k_documents)
             data: dict = {}
@@ -233,13 +233,15 @@ class LocalChatGPT:
                 else:
                     data[document] = doc.page_content
             list_data: list = [f"{doc}\n\n{text}" for doc, text in data.items()]
-            retrieved_docs = "\n\n\n".join(list_data)
-        return retrieved_docs
+            return "\n\n\n".join(list_data)
+        else:
+            return "Появятся после задавания вопросов"
 
-    def bot(self, history, retrieved_docs, top_p, top_k, temp):
+    def bot(self, history, collection_radio, retrieved_docs, top_p, top_k, temp):
         """
 
         :param history:
+        :param collection_radio:
         :param retrieved_docs:
         :param top_p:
         :param top_k:
@@ -256,7 +258,7 @@ class LocalChatGPT:
             tokens.extend(message_tokens)
 
         last_user_message = history[-1][0]
-        if retrieved_docs:
+        if retrieved_docs and collection_radio == self.allowed_actions[0]:
             last_user_message = f"Контекст: {retrieved_docs}\n\nИспользуя контекст, ответь на вопрос: " \
                                 f"{last_user_message}"
         message_tokens = self.get_message_tokens(model=self.llama_model, role="user", content=last_user_message)
@@ -405,6 +407,16 @@ class LocalChatGPT:
                         placeholder="👉 Напишите запрос",
                         container=False
                     )
+                    collection_radio = gr.Radio(
+                        choices=self.allowed_actions,
+                        value=self.allowed_actions[0],
+                        label="Действие",
+                        info="Переключение между выбором коллекций. Нужен ли контекст или нет?"
+                    )
+                    collection_radio.change(
+                        fn=lambda c: c,
+                        inputs=[collection_radio]
+                    )
                 with gr.Column(scale=3, min_width=100):
                     submit = gr.Button("📤 Отправить", variant="primary")
 
@@ -442,12 +454,12 @@ class LocalChatGPT:
                 queue=True,
             ).success(
                 fn=self.retrieve,
-                inputs=[chatbot, db, retrieved_docs, k_documents],
+                inputs=[chatbot, db, collection_radio, k_documents],
                 outputs=[retrieved_docs],
                 queue=True,
             ).success(
                 fn=self.bot,
-                inputs=[chatbot, retrieved_docs, top_p, top_k, temp],
+                inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp],
                 outputs=chatbot,
                 queue=True,
             )
@@ -460,12 +472,12 @@ class LocalChatGPT:
                 queue=True,
             ).success(
                 fn=self.retrieve,
-                inputs=[chatbot, db, retrieved_docs, k_documents],
+                inputs=[chatbot, db, collection_radio, k_documents],
                 outputs=[retrieved_docs],
                 queue=True,
             ).success(
                 fn=self.bot,
-                inputs=[chatbot, retrieved_docs, top_p, top_k, temp],
+                inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp],
                 outputs=chatbot,
                 queue=True,
             )
@@ -487,12 +499,12 @@ class LocalChatGPT:
                 queue=False,
             ).success(
                 fn=self.retrieve,
-                inputs=[chatbot, db, retrieved_docs, k_documents],
+                inputs=[chatbot, db, collection_radio, k_documents],
                 outputs=[retrieved_docs],
                 queue=True,
             ).success(
                 fn=self.bot,
-                inputs=[chatbot, retrieved_docs, top_p, top_k, temp],
+                inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp],
                 outputs=chatbot,
                 queue=True,
             )
