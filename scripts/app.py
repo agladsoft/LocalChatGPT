@@ -227,7 +227,7 @@ class LocalChatGPT:
             docs = db.similarity_search(last_user_message, k_documents)
             data: dict = {}
             for doc in docs:
-                document: str = f'Документ - {doc.metadata["source"].split("/")[-1]}'
+                document: str = f'Документ - {doc.metadata["source"].split("/")[-1]} ↓'
                 if document in data:
                     data[document] += "\n" + doc.page_content
                 else:
