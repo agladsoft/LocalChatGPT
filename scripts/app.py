@@ -20,7 +20,7 @@ class LocalChatGPT:
         self.llama_model: Optional[Llama] = None
         self.embeddings: HuggingFaceEmbeddings = self.initialize_app()
         self.collection: str = "all-documents"
-        self.allowed_actions: list = ["С контекстом", "Без контекста"]
+        self.allowed_actions: list = ["LLM", "DB"]
 
     def initialize_app(self) -> HuggingFaceEmbeddings:
         """
@@ -227,7 +227,9 @@ class LocalChatGPT:
             docs = db.similarity_search(last_user_message, k_documents)
             data: dict = {}
             for doc in docs:
-                document: str = f'Документ - {doc.metadata["source"].split("/")[-1]} ↓'
+                url = f"""<<a href="file/{doc.metadata["source"]}" target="_blank" 
+                rel="noopener noreferrer">{doc.metadata["source"].split("/")[-1]}</a>"""
+                document: str = f'Документ - {url} ↓'
                 if document in data:
                     data[document] += "\n" + doc.page_content
                 else:
@@ -376,10 +378,12 @@ class LocalChatGPT:
                     )
 
             with gr.Row():
-                retrieved_docs = gr.Textbox(
+                retrieved_docs = gr.Markdown(
+                    value="Появятся после задавания вопросов",
                     label="Извлеченные фрагменты",
-                    placeholder="Появятся после задавания вопросов",
-                    interactive=False
+                    show_label=True
+                    # placeholder="Появятся после задавания вопросов",
+                    # interactive=False
                 )
 
             with gr.Row():
