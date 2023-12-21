@@ -38,7 +38,7 @@ class LocalChatGPT:
 
         self.llama_model = Llama(
             model_path=final_model_path,
-            n_ctx=2000,
+            n_ctx=5000,
             n_parts=1,
         )
 
@@ -60,7 +60,7 @@ class LocalChatGPT:
 
         self.llama_model = Llama(
             model_path=final_model_path,
-            n_ctx=2000,
+            n_ctx=5000,
             n_parts=1,
         )
         return model_name
