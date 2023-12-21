@@ -222,7 +222,7 @@ class LocalChatGPT:
         :param k_documents:
         :return:
         """
-        if db and collection_radio == self.allowed_actions[0]:
+        if db and collection_radio == self.allowed_actions[1]:
             last_user_message = history[-1][0]
             docs = db.similarity_search(last_user_message, k_documents)
             data: dict = {}
@@ -260,7 +260,7 @@ class LocalChatGPT:
             tokens.extend(message_tokens)
 
         last_user_message = history[-1][0]
-        if retrieved_docs and collection_radio == self.allowed_actions[0]:
+        if retrieved_docs and collection_radio == self.allowed_actions[1]:
             last_user_message = f"Контекст: {retrieved_docs}\n\nИспользуя контекст, ответь на вопрос: " \
                                 f"{last_user_message}"
         message_tokens = self.get_message_tokens(model=self.llama_model, role="user", content=last_user_message)
@@ -418,7 +418,7 @@ class LocalChatGPT:
                     )
                     collection_radio = gr.Radio(
                         choices=self.allowed_actions,
-                        value=self.allowed_actions[0],
+                        value=self.allowed_actions[1],
                         label="Коллекции",
                         info="Переключение между выбором коллекций. Нужен ли контекст или нет?"
                     )
