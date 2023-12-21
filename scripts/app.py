@@ -363,7 +363,7 @@ class LocalChatGPT:
                     top_k = gr.Slider(
                         minimum=10,
                         maximum=100,
-                        value=30,
+                        value=80,
                         step=5,
                         interactive=True,
                         label="Top-k",
