@@ -227,7 +227,7 @@ class LocalChatGPT:
             docs = db.similarity_search(last_user_message, k_documents)
             data: dict = {}
             for doc in docs:
-                url = f"""<<a href="file/{doc.metadata["source"]}" target="_blank" 
+                url = f"""<a href="file/{doc.metadata["source"]}" target="_blank" 
                 rel="noopener noreferrer">{doc.metadata["source"].split("/")[-1]}</a>"""
                 document: str = f'Документ - {url} ↓'
                 if document in data:
