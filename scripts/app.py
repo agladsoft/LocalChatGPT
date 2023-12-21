@@ -224,16 +224,16 @@ class LocalChatGPT:
         """
         if db and collection_radio == self.allowed_actions[0]:
             last_user_message = history[-1][0]
-            docs = db.similarity_search(last_user_message, k_documents)
+            docs = db.similarity_search_with_score(last_user_message, k_documents)
             data: dict = {}
             for doc in docs:
-                url = f"""<a href="file/{doc.metadata["source"]}" target="_blank" 
-                rel="noopener noreferrer">{doc.metadata["source"].split("/")[-1]}</a>"""
+                url = f"""<a href="file/{doc[0].metadata["source"]}" target="_blank" 
+                rel="noopener noreferrer">{doc[0].metadata["source"].split("/")[-1]}</a>"""
                 document: str = f'Документ - {url} ↓'
                 if document in data:
-                    data[document] += "\n" + doc.page_content
+                    data[document] += "\n\n" + f"Score: {round(doc[1], 2)}, Text: {doc[0].page_content}"
                 else:
-                    data[document] = doc.page_content
+                    data[document] = f"Score: {round(doc[1], 2)}, Text: {doc[0].page_content}"
             list_data: list = [f"{doc}\n\n{text}" for doc, text in data.items()]
             return "\n\n\n".join(list_data)
         else:
