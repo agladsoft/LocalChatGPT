@@ -382,9 +382,14 @@ class LocalChatGPT:
                     value="Появятся после задавания вопросов",
                     label="Извлеченные фрагменты",
                     show_label=True
-                    # placeholder="Появятся после задавания вопросов",
-                    # interactive=False
                 )
+                # retrieved_docs = gr.Textbox(
+                #     label="Извлеченные фрагменты",
+                #     show_label=True,
+                #     placeholder="Появятся после задавания вопросов",
+                #     interactive=False,
+                #     show_copy_button=True
+                # )
 
             with gr.Row():
                 with gr.Column(scale=4):
