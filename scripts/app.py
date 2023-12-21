@@ -7,7 +7,7 @@ from re import Pattern
 from __init__ import *
 from llama_cpp import Llama
 from gradio.themes.utils import sizes
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Tuple
 from langchain.vectorstores import Chroma
 from langchain.docstore.document import Document
 from huggingface_hub.file_download import http_get
@@ -38,7 +38,7 @@ class LocalChatGPT:
 
         self.llama_model = Llama(
             model_path=final_model_path,
-            n_ctx=5000,
+            n_ctx=3000,
             n_parts=1,
         )
 
@@ -60,7 +60,7 @@ class LocalChatGPT:
 
         self.llama_model = Llama(
             model_path=final_model_path,
-            n_ctx=5000,
+            n_ctx=3000,
             n_parts=1,
         )
         return model_name
@@ -213,7 +213,7 @@ class LocalChatGPT:
         """
         return "", history
 
-    def retrieve(self, history, db: Optional[Chroma], collection_radio, k_documents: int) -> str:
+    def retrieve(self, history, db: Optional[Chroma], collection_radio, k_documents: int) -> Tuple[str, str]:
         """
 
         :param history:
@@ -235,9 +235,9 @@ class LocalChatGPT:
                 else:
                     data[document] = f"Score: {round(doc[1], 2)}, Text: {doc[0].page_content}"
             list_data: list = [f"{doc}\n\n{text}" for doc, text in data.items()]
-            return "\n\n\n".join(list_data)
+            return "\n\n\n".join(list_data), "".join(data.values())
         else:
-            return "Появятся после задавания вопросов"
+            return "Появятся после задавания вопросов", ""
 
     def bot(self, history, collection_radio, retrieved_docs, top_p, top_k, temp):
         """
@@ -383,6 +383,7 @@ class LocalChatGPT:
                     label="Извлеченные фрагменты",
                     show_label=True
                 )
+                context = retrieved_docs
                 # retrieved_docs = gr.Textbox(
                 #     label="Извлеченные фрагменты",
                 #     show_label=True,
@@ -464,11 +465,11 @@ class LocalChatGPT:
             ).success(
                 fn=self.retrieve,
                 inputs=[chatbot, db, collection_radio, k_documents],
-                outputs=[retrieved_docs],
+                outputs=[retrieved_docs, context],
                 queue=True,
             ).success(
                 fn=self.bot,
-                inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp],
+                inputs=[chatbot, collection_radio, context, top_p, top_k, temp],
                 outputs=chatbot,
                 queue=True,
             )
@@ -482,11 +483,11 @@ class LocalChatGPT:
             ).success(
                 fn=self.retrieve,
                 inputs=[chatbot, db, collection_radio, k_documents],
-                outputs=[retrieved_docs],
+                outputs=[retrieved_docs, context],
                 queue=True,
             ).success(
                 fn=self.bot,
-                inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp],
+                inputs=[chatbot, collection_radio, context, top_p, top_k, temp],
                 outputs=chatbot,
                 queue=True,
             )
@@ -509,11 +510,11 @@ class LocalChatGPT:
             ).success(
                 fn=self.retrieve,
                 inputs=[chatbot, db, collection_radio, k_documents],
-                outputs=[retrieved_docs],
+                outputs=[retrieved_docs, context],
                 queue=True,
             ).success(
                 fn=self.bot,
-                inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp],
+                inputs=[chatbot, collection_radio, context, top_p, top_k, temp],
                 outputs=chatbot,
                 queue=True,
             )
