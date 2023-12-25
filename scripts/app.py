@@ -198,6 +198,7 @@ class LocalChatGPT:
             collection_name=self.collection,
         )
         file_warning = f"Загружено {len(fixed_documents)} фрагментов! Можно задавать вопросы."
+        os.chmod(FILES_DIR, 0o0777)
         return db, file_warning
 
     @staticmethod
@@ -390,11 +391,12 @@ class LocalChatGPT:
                     )
 
             with gr.Accordion("Контекст", open=False):
-                retrieved_docs = gr.Markdown(
-                    value="Появятся после задавания вопросов",
-                    label="Извлеченные фрагменты",
-                    show_label=True
-                )
+                with gr.Column(variant="compact"):
+                    retrieved_docs = gr.Markdown(
+                        value="Появятся после задавания вопросов",
+                        label="Извлеченные фрагменты",
+                        show_label=True
+                    )
 
             with gr.Row():
                 with gr.Column(scale=4, variant="compact"):
