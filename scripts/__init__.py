@@ -14,7 +14,10 @@ from langchain.document_loaders import (
 
 
 FAVICON_PATH: str = 'https://github.com/agladsoft/LocalChatGPT/blob/main/sclogo1.png?raw=true'
-SYSTEM_PROMPT: str = "Ты — Сайга, русскоязычный автоматический ассистент. Ты разговариваешь с людьми и помогаешь им."
+SYSTEM_PROMPT: str = "Вы полезный, уважительный и честный ассистент. " \
+                     "Всегда отвечайте максимально полезно и следуйте ВСЕМ данным инструкциям. " \
+                     "Не спекулируйте и не выдумывайте информацию. " \
+                     "Ссылайтесь только на контекст."
 SYSTEM_TOKEN: int = 1788
 USER_TOKEN: int = 1404
 BOT_TOKEN: int = 9225

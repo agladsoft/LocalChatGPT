@@ -1,5 +1,6 @@
 import re
 import csv
+import os.path
 import chromadb
 import tempfile
 import gradio as gr
@@ -7,7 +8,7 @@ from re import Pattern
 from __init__ import *
 from llama_cpp import Llama
 from gradio.themes.utils import sizes
-from typing import List, Optional, Union, Tuple
+from typing import List, Optional, Union
 from langchain.vectorstores import Chroma
 from langchain.docstore.document import Document
 from huggingface_hub.file_download import http_get
@@ -137,8 +138,8 @@ class LocalChatGPT:
         :return:
         """
         data: dict = db.get()
-        files_db = {dict_data['source'].split('/')[-1] for dict_data in data["metadatas"]}
-        files_load = {dict_data.metadata["source"].split('/')[-1] for dict_data in fixed_documents}
+        files_db = {os.path.basename(dict_data['source']) for dict_data in data["metadatas"]}
+        files_load = {os.path.basename(dict_data.metadata["source"]) for dict_data in fixed_documents}
         if same_files := files_load & files_db:
             gr.Warning("Файлы " + ", ".join(same_files) + " повторяются, поэтому они будут обновлены")
             for file in same_files:
@@ -183,7 +184,7 @@ class LocalChatGPT:
             fixed_documents.append(doc)
 
         ids: List[str] = [
-            f"{doc.metadata['source'].split('/')[-1].replace('.txt', '')}{i}"
+            f"{os.path.basename(doc.metadata['source']).replace('.txt', '')}{i}"
             for i, doc in enumerate(fixed_documents)
         ]
         is_updated, db, file_warning = self.update_text_db(db, fixed_documents, ids)
@@ -228,7 +229,7 @@ class LocalChatGPT:
             data: dict = {}
             for doc in docs:
                 url = f"""<a href="file/{doc[0].metadata["source"]}" target="_blank" 
-                rel="noopener noreferrer">{doc[0].metadata["source"].split("/")[-1]}</a>"""
+                rel="noopener noreferrer">{os.path.basename(doc[0].metadata["source"])}</a>"""
                 document: str = f'Документ - {url} ↓'
                 if document in data:
                     data[document] += "\n\n" + f"Score: {round(doc[1], 2)}, Text: {doc[0].page_content}"
@@ -265,7 +266,7 @@ class LocalChatGPT:
         result_text = match[1] if match else ""
         retrieved_docs = re.sub(pattern, result_text, retrieved_docs)
         if retrieved_docs and collection_radio == self.allowed_actions[0]:
-            last_user_message = f"Контекст: {retrieved_docs}\n\nИспользуя контекст, ответь на вопрос: " \
+            last_user_message = f"Контекст: {retrieved_docs}\n\nИспользуя только контекст, ответь на вопрос: " \
                                     f"{last_user_message}"
         message_tokens = self.get_message_tokens(model=self.llama_model, role="user", content=last_user_message)
         tokens.extend(message_tokens)
@@ -287,12 +288,12 @@ class LocalChatGPT:
             history[-1][1] = partial_text
             yield history
 
-    @staticmethod
-    def ingest_files(db: Chroma):
-        files = set()
-        for ingested_document in db.get()["metadatas"]:
-            files.add(os.path.basename(ingested_document["source"]))
-        return [[row] for row in files]
+    # @staticmethod
+    # def ingest_files(db: Chroma):
+    #     files = set()
+    #     for ingested_document in db.get()["metadatas"]:
+    #         files.add(os.path.basename(ingested_document["source"]))
+    #     return pandas.DataFrame({"Files name": [row for row in files]})
 
     def load_db(self) -> Union[Chroma, chromadb.HttpClient]:
         """
@@ -357,7 +358,7 @@ class LocalChatGPT:
                     chunk_overlap = gr.Slider(
                         minimum=0,
                         maximum=500,
-                        value=30,
+                        value=70,
                         step=10,
                         interactive=True,
                         label="Пересечение"
@@ -396,7 +397,7 @@ class LocalChatGPT:
                 )
 
             with gr.Row():
-                with gr.Column(scale=4):
+                with gr.Column(scale=4, variant="compact"):
                     with gr.Row(elem_id="model_selector_row"):
                         models: list = list(DICT_REPO_AND_MODELS.values())
                         model_selector = gr.Dropdown(
