@@ -381,20 +381,12 @@ class LocalChatGPT:
                         label="Temp"
                     )
 
-            with gr.Row():
+            with gr.Accordion("Контекст", open=False):
                 retrieved_docs = gr.Markdown(
                     value="Появятся после задавания вопросов",
                     label="Извлеченные фрагменты",
                     show_label=True
                 )
-                # context = retrieved_docs
-                # retrieved_docs = gr.Textbox(
-                #     label="Извлеченные фрагменты",
-                #     show_label=True,
-                #     placeholder="Появятся после задавания вопросов",
-                #     interactive=False,
-                #     show_copy_button=True
-                # )
 
             with gr.Row():
                 with gr.Column(scale=4):
