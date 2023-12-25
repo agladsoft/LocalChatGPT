@@ -38,7 +38,7 @@ class LocalChatGPT:
 
         self.llama_model = Llama(
             model_path=final_model_path,
-            n_ctx=3000,
+            n_ctx=2500,
             n_parts=1,
         )
 
@@ -60,7 +60,7 @@ class LocalChatGPT:
 
         self.llama_model = Llama(
             model_path=final_model_path,
-            n_ctx=3000,
+            n_ctx=2500,
             n_parts=1,
         )
         return model_name
@@ -213,7 +213,7 @@ class LocalChatGPT:
         """
         return "", history
 
-    def retrieve(self, history, db: Optional[Chroma], collection_radio, k_documents: int) -> Tuple[str, str]:
+    def retrieve(self, history, db: Optional[Chroma], collection_radio, k_documents: int) -> str:
         """
 
         :param history:
@@ -235,9 +235,9 @@ class LocalChatGPT:
                 else:
                     data[document] = f"Score: {round(doc[1], 2)}, Text: {doc[0].page_content}"
             list_data: list = [f"{doc}\n\n{text}" for doc, text in data.items()]
-            return "\n\n\n".join(list_data), "".join(data.values())
+            return "\n\n\n".join(list_data)
         else:
-            return "Появятся после задавания вопросов", ""
+            return "Появятся после задавания вопросов"
 
     def bot(self, history, collection_radio, retrieved_docs, top_p, top_k, temp):
         """
@@ -260,9 +260,13 @@ class LocalChatGPT:
             tokens.extend(message_tokens)
 
         last_user_message = history[-1][0]
+        pattern = r'<a\s+[^>]*>(.*?)</a>'
+        match = re.search(pattern, retrieved_docs)
+        result_text = match[1] if match else ""
+        retrieved_docs = re.sub(pattern, result_text, retrieved_docs)
         if retrieved_docs and collection_radio == self.allowed_actions[0]:
             last_user_message = f"Контекст: {retrieved_docs}\n\nИспользуя контекст, ответь на вопрос: " \
-                                f"{last_user_message}"
+                                    f"{last_user_message}"
         message_tokens = self.get_message_tokens(model=self.llama_model, role="user", content=last_user_message)
         tokens.extend(message_tokens)
 
@@ -329,7 +333,7 @@ class LocalChatGPT:
                     k_documents = gr.Slider(
                         minimum=1,
                         maximum=10,
-                        value=3,
+                        value=4,
                         step=1,
                         interactive=True,
                         label="Кол-во фрагментов для контекста"
@@ -338,7 +342,7 @@ class LocalChatGPT:
                     chunk_size = gr.Slider(
                         minimum=50,
                         maximum=1000,
-                        value=512,
+                        value=700,
                         step=50,
                         interactive=True,
                         label="Размер фрагментов",
@@ -383,7 +387,7 @@ class LocalChatGPT:
                     label="Извлеченные фрагменты",
                     show_label=True
                 )
-                context = retrieved_docs
+                # context = retrieved_docs
                 # retrieved_docs = gr.Textbox(
                 #     label="Извлеченные фрагменты",
                 #     show_label=True,
@@ -465,11 +469,11 @@ class LocalChatGPT:
             ).success(
                 fn=self.retrieve,
                 inputs=[chatbot, db, collection_radio, k_documents],
-                outputs=[retrieved_docs, context],
+                outputs=[retrieved_docs],
                 queue=True,
             ).success(
                 fn=self.bot,
-                inputs=[chatbot, collection_radio, context, top_p, top_k, temp],
+                inputs=[chatbot, collection_radio, top_p, top_k, temp],
                 outputs=chatbot,
                 queue=True,
             )
@@ -483,11 +487,11 @@ class LocalChatGPT:
             ).success(
                 fn=self.retrieve,
                 inputs=[chatbot, db, collection_radio, k_documents],
-                outputs=[retrieved_docs, context],
+                outputs=[retrieved_docs],
                 queue=True,
             ).success(
                 fn=self.bot,
-                inputs=[chatbot, collection_radio, context, top_p, top_k, temp],
+                inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp],
                 outputs=chatbot,
                 queue=True,
             )
@@ -510,11 +514,11 @@ class LocalChatGPT:
             ).success(
                 fn=self.retrieve,
                 inputs=[chatbot, db, collection_radio, k_documents],
-                outputs=[retrieved_docs, context],
+                outputs=[retrieved_docs],
                 queue=True,
             ).success(
                 fn=self.bot,
-                inputs=[chatbot, collection_radio, context, top_p, top_k, temp],
+                inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp],
                 outputs=chatbot,
                 queue=True,
             )

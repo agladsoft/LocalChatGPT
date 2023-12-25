@@ -63,7 +63,7 @@ DB_DIR = os.path.join(ABS_PATH, "../chroma")
 MODELS_DIR = os.path.join(ABS_PATH, "../models")
 AUTH_FILE = os.path.join(ABS_PATH, "auth.csv")
 
-FILES_DIR = os.path.join(ABS_PATH, "upload_files")
+FILES_DIR = os.path.join(ABS_PATH, "../upload_files")
 os.makedirs(FILES_DIR, exist_ok=True)
 os.chmod(FILES_DIR, 0o0777)
 os.environ['GRADIO_TEMP_DIR'] = FILES_DIR
