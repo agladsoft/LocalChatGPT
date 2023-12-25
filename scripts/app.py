@@ -287,6 +287,13 @@ class LocalChatGPT:
             history[-1][1] = partial_text
             yield history
 
+    @staticmethod
+    def ingest_files(db: Chroma):
+        files = set()
+        for ingested_document in db.get()["metadatas"]:
+            files.add(os.path.basename(ingested_document["source"]))
+        return [[row] for row in files]
+
     def load_db(self) -> Union[Chroma, chromadb.HttpClient]:
         """
 
@@ -399,6 +406,16 @@ class LocalChatGPT:
                             show_label=False,
                             container=False,
                         )
+                    collection_radio = gr.Radio(
+                        choices=self.allowed_actions,
+                        value=self.allowed_actions[0],
+                        label="Коллекции",
+                        info="Переключение между выбором коллекций. Нужен ли контекст или нет?"
+                    )
+                    collection_radio.change(
+                        fn=lambda c: c,
+                        inputs=[collection_radio]
+                    )
                     file_output = gr.Files(file_count="multiple", label="Загрузка файлов")
                     file_paths = gr.State([])
                     file_warning = gr.Markdown("Фрагменты ещё не загружены!")
@@ -412,16 +429,6 @@ class LocalChatGPT:
                         show_label=False,
                         placeholder="👉 Напишите запрос",
                         container=False
-                    )
-                    collection_radio = gr.Radio(
-                        choices=self.allowed_actions,
-                        value=self.allowed_actions[0],
-                        label="Коллекции",
-                        info="Переключение между выбором коллекций. Нужен ли контекст или нет?"
-                    )
-                    collection_radio.change(
-                        fn=lambda c: c,
-                        inputs=[collection_radio]
                     )
                 with gr.Column(scale=3, min_width=100):
                     submit = gr.Button("📤 Отправить", variant="primary")
