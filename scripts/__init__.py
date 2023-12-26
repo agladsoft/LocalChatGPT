@@ -48,8 +48,6 @@ LOADER_MAPPING: dict = {
 DICT_REPO_AND_MODELS: dict = {
     "https://huggingface.co/IlyaGusev/saiga2_13b_gguf/resolve/main/model-q4_K.gguf":
         "saiga2_13b_gguf/model-q4_K.gguf",
-    "https://huggingface.co/IlyaGusev/saiga2_7b_gguf/resolve/main/model-q8_0.gguf":
-        "saiga2_7b_gguf/model-q8_0.gguf",
     "https://huggingface.co/IlyaGusev/saiga2_7b_gguf/resolve/main/model-q4_K.gguf":
         "saiga2_7b_gguf/model-q4_K.gguf",
     "https://huggingface.co/IlyaGusev/saiga2_7b_gguf/resolve/main/model-q2_K.gguf":
