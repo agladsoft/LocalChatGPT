@@ -7,6 +7,7 @@ services:
     volumes:
       - ./models:/models  # Монтируйте папку с моделями внутрь контейнера
       - ./chroma:/chroma
+      - ./upload_files:/upload_files
       - ./scripts:/app
     ports:
       - "7860:7860"
