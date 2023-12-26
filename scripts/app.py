@@ -351,7 +351,7 @@ class LocalChatGPT:
                     chunk_size = gr.Slider(
                         minimum=50,
                         maximum=1000,
-                        value=512,
+                        value=700,
                         step=50,
                         interactive=True,
                         label="Размер фрагментов",
@@ -359,7 +359,7 @@ class LocalChatGPT:
                     chunk_overlap = gr.Slider(
                         minimum=0,
                         maximum=500,
-                        value=50,
+                        value=70,
                         step=10,
                         interactive=True,
                         label="Пересечение"
@@ -475,7 +475,7 @@ class LocalChatGPT:
                 queue=True,
             ).success(
                 fn=self.bot,
-                inputs=[chatbot, collection_radio, top_p, top_k, temp],
+                inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp],
                 outputs=chatbot,
                 queue=True,
             )
