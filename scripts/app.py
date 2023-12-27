@@ -41,7 +41,7 @@ class LocalChatGPT:
 
             llama_models.append(Llama(
                 model_path=final_model_path,
-                n_ctx=3000,
+                n_ctx=CONTEXT_SIZE,
                 n_parts=1,
             ))
 
