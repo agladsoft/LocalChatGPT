@@ -51,7 +51,7 @@ DICT_REPO_AND_MODELS: dict = {
     "https://huggingface.co/IlyaGusev/saiga2_7b_gguf/resolve/main/model-q4_K.gguf":
         "saiga2_7b_gguf/model-q4_K.gguf",
     "https://huggingface.co/IlyaGusev/saiga2_7b_gguf/resolve/main/model-q2_K.gguf":
-        "saiga2_7b_gguf/model-q2_K.gguf"
+        "saiga2_7b_gguf/model-q3_K.gguf"
 }
 
 
