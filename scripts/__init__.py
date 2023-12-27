@@ -18,7 +18,7 @@ SYSTEM_PROMPT: str = "Вы, Макар - полезный, уважительн�
                      "Всегда отвечайте максимально полезно и следуйте ВСЕМ данным инструкциям. " \
                      "Не спекулируйте и не выдумывайте информацию. " \
                      "Отвечайте на вопросы, ссылаясь только на контекст."
-CONTEXT_SIZE = 3000
+CONTEXT_SIZE = 2000
 SYSTEM_TOKEN: int = 1788
 USER_TOKEN: int = 1404
 BOT_TOKEN: int = 9225
@@ -47,10 +47,10 @@ LOADER_MAPPING: dict = {
 
 
 DICT_REPO_AND_MODELS: dict = {
-    "https://huggingface.co/IlyaGusev/saiga2_13b_gguf/resolve/main/model-q4_K.gguf":
-        "saiga2_13b_gguf/model-q4_K.gguf",
-    "https://huggingface.co/IlyaGusev/saiga2_7b_gguf/resolve/main/model-q4_K.gguf":
-        "saiga2_7b_gguf/model-q4_K.gguf",
+    # "https://huggingface.co/IlyaGusev/saiga2_13b_gguf/resolve/main/model-q4_K.gguf":
+    #     "saiga2_13b_gguf/model-q4_K.gguf",
+    # "https://huggingface.co/IlyaGusev/saiga2_7b_gguf/resolve/main/model-q4_K.gguf":
+    #     "saiga2_7b_gguf/model-q4_K.gguf",
     "https://huggingface.co/IlyaGusev/saiga2_7b_gguf/resolve/main/model-q2_K.gguf":
         "saiga2_7b_gguf/model-q3_K.gguf"
 }
@@ -65,7 +65,7 @@ DB_DIR = os.path.join(ABS_PATH, "../chroma")
 MODELS_DIR = os.path.join(ABS_PATH, "../models")
 AUTH_FILE = os.path.join(ABS_PATH, "auth.csv")
 AVATAR_USER = os.path.join(ABS_PATH, "icons8-user-color-96.png")
-AVATAR_BOT = os.path.join(ABS_PATH, "icons8-chatgpt-gradient-96.png")
+AVATAR_BOT = os.path.join(ABS_PATH, "icons8-bot-96.png")
 
 FILES_DIR = os.path.join(ABS_PATH, "../upload_files")
 os.makedirs(FILES_DIR, exist_ok=True)
