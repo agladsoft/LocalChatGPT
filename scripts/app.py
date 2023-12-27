@@ -240,7 +240,7 @@ class LocalChatGPT:
         tokens = self.get_system_tokens(model)[:]
         tokens.append(LINEBREAK_TOKEN)
 
-        for user_message, bot_message in history[:-1]:
+        for user_message, bot_message in history[-4:-1]:
             message_tokens = self.get_message_tokens(model=model, role="user", content=user_message)
             tokens.extend(message_tokens)
 
