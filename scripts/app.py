@@ -236,6 +236,7 @@ class LocalChatGPT:
         """
         print(retrieved_docs)
         retrieved_docs = self.retrieve(message, db, collection_radio, k_documents)
+        yield retrieved_docs
         model = next((model for model in self.llama_models if model_selector in model.model_path), None)
         tokens = self.get_system_tokens(model)[:]
         tokens.append(LINEBREAK_TOKEN)
@@ -409,6 +410,7 @@ class LocalChatGPT:
                         fn=self.bot,
                         additional_inputs=[db, k_documents, collection_radio, retrieved_docs, top_p, top_k, temp,
                                            model_selector],
+                        analytics_enabled=True,
                         submit_btn="📤 Отправить",
                         stop_btn="⛔ Остановить",
                         retry_btn="🔄 Повторить",
