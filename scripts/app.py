@@ -407,7 +407,8 @@ class LocalChatGPT:
                 with gr.Column(scale=10):
                     gr.ChatInterface(
                         fn=self.bot,
-                        additional_inputs=[db, k_documents, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector],
+                        additional_inputs=[db, k_documents, collection_radio, retrieved_docs, top_p, top_k, temp,
+                                           model_selector],
                         submit_btn="📤 Отправить",
                         stop_btn="⛔ Остановить",
                         retry_btn="🔄 Повторить",
