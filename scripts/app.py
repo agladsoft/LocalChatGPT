@@ -182,32 +182,17 @@ class LocalChatGPT:
         os.chmod(FILES_DIR, 0o0777)
         return db, file_warning
 
-    @staticmethod
-    def user(message, history):
-        new_history = history + [[message, None]]
-        return "", new_history
-
-    @staticmethod
-    def regenerate_response(history):
+    def retrieve(self, message, db: Optional[Chroma], collection_radio, k_documents: int) -> str:
         """
 
-        :param history:
-        :return:
-        """
-        return "", history
-
-    def retrieve(self, history, db: Optional[Chroma], collection_radio, k_documents: int) -> str:
-        """
-
-        :param history:
+        :param message:
         :param db:
         :param collection_radio:
         :param k_documents:
         :return:
         """
         if db and collection_radio == self.allowed_actions[0]:
-            last_user_message = history[-1][0]
-            docs = db.similarity_search_with_score(last_user_message, k_documents)
+            docs = db.similarity_search_with_score(message, k_documents)
             data: dict = {}
             for doc in docs:
                 url = f"""<a href="file/{doc[0].metadata["source"]}" target="_blank" 
@@ -222,37 +207,51 @@ class LocalChatGPT:
         else:
             return "Появятся после задавания вопросов"
 
-    def bot(self, history, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector):
+    def bot(
+        self,
+        message,
+        history,
+        db,
+        k_documents,
+        collection_radio,
+        retrieved_docs,
+        top_p,
+        top_k,
+        temp,
+        model_selector
+    ):
         """
 
+        :param message:
         :param history:
+        :param db:
+        :param k_documents:
         :param collection_radio:
-        :param retrieved_docs:
+        :param retrieved_docs,
         :param top_p:
         :param top_k:
         :param temp:
         :param model_selector:
         :return:
         """
-        if not history:
-            return
+        print(retrieved_docs)
+        retrieved_docs = self.retrieve(message, db, collection_radio, k_documents)
         model = next((model for model in self.llama_models if model_selector in model.model_path), None)
         tokens = self.get_system_tokens(model)[:]
         tokens.append(LINEBREAK_TOKEN)
 
-        for user_message, bot_message in history[:-1]:
+        for user_message, bot_message in history:
             message_tokens = self.get_message_tokens(model=model, role="user", content=user_message)
             tokens.extend(message_tokens)
 
-        last_user_message = history[-1][0]
         pattern = r'<a\s+[^>]*>(.*?)</a>'
         match = re.search(pattern, retrieved_docs)
         result_text = match[1] if match else ""
         retrieved_docs = re.sub(pattern, result_text, retrieved_docs)
         if retrieved_docs and collection_radio == self.allowed_actions[0]:
-            last_user_message = f"Контекст: {retrieved_docs}\n\nИспользуя только контекст, ответь на вопрос: " \
-                                    f"{last_user_message}"
-        message_tokens = self.get_message_tokens(model=model, role="user", content=last_user_message)
+            message = f"Контекст: {retrieved_docs}\n\nИспользуя только контекст, ответь на вопрос: " \
+                                    f"{message}"
+        message_tokens = self.get_message_tokens(model=model, role="user", content=message)
         tokens.extend(message_tokens)
 
         role_tokens = [model.token_bos(), BOT_TOKEN, LINEBREAK_TOKEN]
@@ -269,8 +268,8 @@ class LocalChatGPT:
             if token == model.token_eos() or (MAX_NEW_TOKENS is not None and i >= MAX_NEW_TOKENS):
                 break
             partial_text += model.detokenize([token]).decode("utf-8", "ignore")
-            history[-1][1] = partial_text
-            yield history
+            # history[-1][1] = partial_text
+            yield partial_text
 
     # @staticmethod
     # def ingest_files(db: Chroma):
@@ -406,25 +405,15 @@ class LocalChatGPT:
                     file_paths = gr.State([])
                     file_warning = gr.Markdown("Фрагменты ещё не загружены!")
                 with gr.Column(scale=10):
-                    chatbot = gr.Chatbot(label="Диалог", height=500, show_copy_button=True, show_share_button=True)
-
-            with gr.Row():
-                with gr.Column(scale=20):
-                    msg = gr.Textbox(
-                        label="Отправить сообщение",
-                        show_label=False,
-                        placeholder="👉 Напишите запрос",
-                        container=False
+                    gr.ChatInterface(
+                        fn=self.bot,
+                        additional_inputs=[db, k_documents, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector],
+                        submit_btn="📤 Отправить",
+                        stop_btn="⛔ Остановить",
+                        retry_btn="🔄 Повторить",
+                        undo_btn="↩️ Назад",
+                        clear_btn="🗑️  Очистить"
                     )
-                with gr.Column(scale=3, min_width=100):
-                    submit = gr.Button("📤 Отправить", variant="primary")
-
-            with gr.Row(elem_id="buttons"):
-                gr.Button(value="👍 Понравилось")
-                gr.Button(value="👎 Не понравилось")
-                stop = gr.Button(value="⛔ Остановить")
-                regenerate = gr.Button(value="🔄 Повторить")
-                clear = gr.Button(value="🗑️ Очистить")
 
             # Upload files
             file_output.upload(
@@ -438,72 +427,6 @@ class LocalChatGPT:
                 outputs=[db, file_warning],
                 queue=True
             )
-
-            # Pressing Enter
-            submit_event = msg.submit(
-                fn=self.user,
-                inputs=[msg, chatbot],
-                outputs=[msg, chatbot],
-                queue=False,
-            ).success(
-                fn=self.retrieve,
-                inputs=[chatbot, db, collection_radio, k_documents],
-                outputs=[retrieved_docs],
-                queue=True,
-            ).success(
-                fn=self.bot,
-                inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector],
-                outputs=chatbot,
-                queue=True,
-            )
-
-            # Pressing the button
-            submit_click_event = submit.click(
-                fn=self.user,
-                inputs=[msg, chatbot],
-                outputs=[msg, chatbot],
-                queue=False,
-            ).success(
-                fn=self.retrieve,
-                inputs=[chatbot, db, collection_radio, k_documents],
-                outputs=[retrieved_docs],
-                queue=True,
-            ).success(
-                fn=self.bot,
-                inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector],
-                outputs=chatbot,
-                queue=True,
-            )
-
-            # Stop generation
-            stop.click(
-                fn=None,
-                inputs=None,
-                outputs=None,
-                cancels=[submit_event, submit_click_event],
-                queue=False,
-            )
-
-            # Regenerate
-            regenerate.click(
-                fn=self.regenerate_response,
-                inputs=[chatbot],
-                outputs=[msg, chatbot],
-                queue=False,
-            ).success(
-                fn=self.retrieve,
-                inputs=[chatbot, db, collection_radio, k_documents],
-                outputs=[retrieved_docs],
-                queue=False,
-            ).success(
-                fn=self.bot,
-                inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector],
-                outputs=chatbot,
-                queue=False,
-            )
-
-            # Clear history
-            clear.click(lambda: None, None, chatbot, queue=False)
 
         demo.queue(max_size=128, api_open=False)
         demo.launch(server_name="0.0.0.0", max_threads=200)
