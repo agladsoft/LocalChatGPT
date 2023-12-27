@@ -64,6 +64,8 @@ ABS_PATH = os.path.dirname(os.path.abspath(__file__))
 DB_DIR = os.path.join(ABS_PATH, "../chroma")
 MODELS_DIR = os.path.join(ABS_PATH, "../models")
 AUTH_FILE = os.path.join(ABS_PATH, "auth.csv")
+AVATAR_USER = os.path.join(ABS_PATH, "icons8-user-color-96.png")
+AVATAR_BOT = os.path.join(ABS_PATH, "icons8-chatgpt-gradient-96.png")
 
 FILES_DIR = os.path.join(ABS_PATH, "../upload_files")
 os.makedirs(FILES_DIR, exist_ok=True)

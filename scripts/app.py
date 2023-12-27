@@ -406,7 +406,16 @@ class LocalChatGPT:
                     file_paths = gr.State([])
                     file_warning = gr.Markdown("Фрагменты ещё не загружены!")
                 with gr.Column(scale=10):
-                    chatbot = gr.Chatbot(label="Диалог", height=500, show_copy_button=True, show_share_button=True)
+                    chatbot = gr.Chatbot(
+                        label="Диалог",
+                        height=500,
+                        show_copy_button=True,
+                        show_share_button=True,
+                        avatar_images=(
+                            AVATAR_USER,
+                            AVATAR_BOT
+                        )
+                    )
 
             with gr.Row():
                 with gr.Column(scale=20):
