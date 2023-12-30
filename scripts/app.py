@@ -197,7 +197,7 @@ class LocalChatGPT:
         """
         return "", history
 
-    def retrieve(self, history, db: Optional[Chroma], collection_radio, k_documents: int) -> str:
+    def retrieve(self, history, db: Optional[Chroma], collection_radio, k_documents: int) -> Union[list, str]:
         """
 
         :param history:
@@ -219,7 +219,7 @@ class LocalChatGPT:
                 else:
                     data[document] = f"Score: {round(doc[1], 2)}, Text: {doc[0].page_content}"
             list_data: list = [f"{doc}\n\n{text}" for doc, text in data.items()]
-            return "\n\n\n".join(list_data)
+            return "\n\n\n".join(list_data) if list_data else "Документов в базе нету"
         else:
             return "Появятся после задавания вопросов"
 
