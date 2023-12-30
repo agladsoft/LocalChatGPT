@@ -3,6 +3,7 @@ import csv
 import os.path
 import chromadb
 import tempfile
+import pandas as pd
 import gradio as gr
 from re import Pattern
 from __init__ import *
@@ -272,12 +273,25 @@ class LocalChatGPT:
             history[-1][1] = partial_text
             yield history
 
-    # @staticmethod
-    # def ingest_files(db: Chroma):
-    #     files = set()
-    #     for ingested_document in db.get()["metadatas"]:
-    #         files.add(os.path.basename(ingested_document["source"]))
-    #     return pandas.DataFrame({"Files name": [row for row in files]})
+    def ingest_files(self):
+        db = self.load_db()
+        files = {
+            os.path.basename(ingested_document["source"])
+            for ingested_document in db.get()["metadatas"]
+        }
+        return pd.DataFrame({"Название файлов": list(files)})
+
+    def delete_doc(self, document):
+        db = self.load_db()
+        all_documents = db.get()
+        for_delete_ids = []
+        for ingested_document, doc_id in zip(all_documents["metadatas"], all_documents["ids"]):
+            print(ingested_document)
+            if os.path.basename(ingested_document["source"]) == document:
+                for_delete_ids.append(doc_id)
+        if for_delete_ids:
+            db.delete(for_delete_ids)
+        return "", self.ingest_files()
 
     def load_db(self) -> Union[Chroma, chromadb.HttpClient]:
         """
@@ -320,120 +334,138 @@ class LocalChatGPT:
                 f"""<h1><center>{favicon} Я, Макар - текстовый ассистент на основе GPT</center></h1>"""
             )
 
-            with gr.Accordion("Параметры", open=False):
-                with gr.Tab(label="Параметры извлечения фрагментов из текста"):
-                    k_documents = gr.Slider(
-                        minimum=1,
-                        maximum=6,
-                        value=4,
-                        step=1,
-                        interactive=True,
-                        label="Кол-во фрагментов для контекста"
-                    )
-                with gr.Tab(label="Параметры нарезки"):
-                    chunk_size = gr.Slider(
-                        minimum=50,
-                        maximum=1000,
-                        value=500,
-                        step=50,
-                        interactive=True,
-                        label="Размер фрагментов",
-                    )
-                    chunk_overlap = gr.Slider(
-                        minimum=0,
-                        maximum=500,
-                        value=50,
-                        step=10,
-                        interactive=True,
-                        label="Пересечение"
-                    )
-                with gr.Tab(label="Параметры генерации"):
-                    top_p = gr.Slider(
-                        minimum=0.0,
-                        maximum=1.0,
-                        value=0.9,
-                        step=0.05,
-                        interactive=True,
-                        label="Top-p",
-                    )
-                    top_k = gr.Slider(
-                        minimum=10,
-                        maximum=100,
-                        value=80,
-                        step=5,
-                        interactive=True,
-                        label="Top-k",
-                    )
-                    temp = gr.Slider(
-                        minimum=0.0,
-                        maximum=2.0,
-                        value=0.1,
-                        step=0.1,
-                        interactive=True,
-                        label="Temp"
-                    )
-
-            with gr.Accordion("Контекст", open=False):
-                with gr.Column(variant="compact"):
-                    retrieved_docs = gr.Markdown(
-                        value="Появятся после задавания вопросов",
-                        label="Извлеченные фрагменты",
-                        show_label=True
-                    )
-
-            with gr.Row():
-                with gr.Column(scale=4, variant="compact"):
-                    with gr.Row(elem_id="model_selector_row"):
-                        models: list = list(DICT_REPO_AND_MODELS.values())
-                        model_selector = gr.Dropdown(
-                            choices=models,
-                            value=models[0] if models else "",
+            with gr.Tab("Чат"):
+                with gr.Accordion("Параметры", open=False):
+                    with gr.Tab(label="Параметры извлечения фрагментов из текста"):
+                        k_documents = gr.Slider(
+                            minimum=1,
+                            maximum=6,
+                            value=4,
+                            step=1,
                             interactive=True,
+                            label="Кол-во фрагментов для контекста"
+                        )
+                    with gr.Tab(label="Параметры нарезки"):
+                        chunk_size = gr.Slider(
+                            minimum=50,
+                            maximum=1000,
+                            value=500,
+                            step=50,
+                            interactive=True,
+                            label="Размер фрагментов",
+                        )
+                        chunk_overlap = gr.Slider(
+                            minimum=0,
+                            maximum=500,
+                            value=50,
+                            step=10,
+                            interactive=True,
+                            label="Пересечение"
+                        )
+                    with gr.Tab(label="Параметры генерации"):
+                        top_p = gr.Slider(
+                            minimum=0.0,
+                            maximum=1.0,
+                            value=0.9,
+                            step=0.05,
+                            interactive=True,
+                            label="Top-p",
+                        )
+                        top_k = gr.Slider(
+                            minimum=10,
+                            maximum=100,
+                            value=80,
+                            step=5,
+                            interactive=True,
+                            label="Top-k",
+                        )
+                        temp = gr.Slider(
+                            minimum=0.0,
+                            maximum=2.0,
+                            value=0.1,
+                            step=0.1,
+                            interactive=True,
+                            label="Temp"
+                        )
+
+                with gr.Accordion("Контекст", open=False):
+                    with gr.Column(variant="compact"):
+                        retrieved_docs = gr.Markdown(
+                            value="Появятся после задавания вопросов",
+                            label="Извлеченные фрагменты",
+                            show_label=True
+                        )
+
+                with gr.Row():
+                    with gr.Column(scale=4, variant="compact"):
+                        with gr.Row(elem_id="model_selector_row"):
+                            models: list = list(DICT_REPO_AND_MODELS.values())
+                            model_selector = gr.Dropdown(
+                                choices=models,
+                                value=models[0] if models else "",
+                                interactive=True,
+                                show_label=False,
+                                container=False,
+                            )
+                        collection_radio = gr.Radio(
+                            choices=self.allowed_actions,
+                            value=self.allowed_actions[0],
+                            label="Коллекции",
+                            info="Переключение между выбором коллекций. Нужен ли контекст или нет?"
+                        )
+                        collection_radio.change(
+                            fn=lambda c: c,
+                            inputs=[collection_radio]
+                        )
+                        file_output = gr.Files(file_count="multiple", label="Загрузка файлов")
+                        file_paths = gr.State([])
+                        file_warning = gr.Markdown("Фрагменты ещё не загружены!")
+                    with gr.Column(scale=10):
+                        chatbot = gr.Chatbot(
+                            label="Диалог",
+                            height=500,
+                            show_copy_button=True,
+                            show_share_button=True,
+                            avatar_images=(
+                                AVATAR_USER,
+                                AVATAR_BOT
+                            )
+                        )
+
+                with gr.Row():
+                    with gr.Column(scale=20):
+                        msg = gr.Textbox(
+                            label="Отправить сообщение",
                             show_label=False,
-                            container=False,
+                            placeholder="👉 Напишите запрос",
+                            container=False
                         )
-                    collection_radio = gr.Radio(
-                        choices=self.allowed_actions,
-                        value=self.allowed_actions[0],
-                        label="Коллекции",
-                        info="Переключение между выбором коллекций. Нужен ли контекст или нет?"
-                    )
-                    collection_radio.change(
-                        fn=lambda c: c,
-                        inputs=[collection_radio]
-                    )
-                    file_output = gr.Files(file_count="multiple", label="Загрузка файлов")
-                    file_paths = gr.State([])
-                    file_warning = gr.Markdown("Фрагменты ещё не загружены!")
-                with gr.Column(scale=10):
-                    chatbot = gr.Chatbot(
-                        label="Диалог",
-                        height=500,
-                        show_copy_button=True,
-                        show_share_button=True,
-                        avatar_images=(
-                            AVATAR_USER,
-                            AVATAR_BOT
+                    with gr.Column(scale=3, min_width=100):
+                        submit = gr.Button("📤 Отправить", variant="primary")
+
+                with gr.Row(elem_id="buttons"):
+                    gr.Button(value="👍 Понравилось")
+                    gr.Button(value="👎 Не понравилось")
+                    stop = gr.Button(value="⛔ Остановить")
+                    regenerate = gr.Button(value="🔄 Повторить")
+                    clear = gr.Button(value="🗑️ Очистить")
+
+            with gr.Tab("Документы"):
+                with gr.Row():
+                    with gr.Column(scale=3):
+                        find_doc = gr.Textbox(
+                            label="Отправить сообщение",
+                            show_label=False,
+                            placeholder="👉 Напишите название документа",
+                            container=False
                         )
-                    )
-
-            with gr.Row():
-                with gr.Column(scale=20):
-                    msg = gr.Textbox(
-                        label="Отправить сообщение",
-                        show_label=False,
-                        placeholder="👉 Напишите запрос",
-                        container=False
-                    )
-                with gr.Column(scale=3, min_width=100):
-                    submit = gr.Button("📤 Отправить", variant="primary")
-
-            with gr.Row(elem_id="buttons"):
-                gr.Button(value="👍 Понравилось")
-                gr.Button(value="👎 Не понравилось")
-                stop = gr.Button(value="⛔ Остановить")
-                regenerate = gr.Button(value="🔄 Повторить")
-                clear = gr.Button(value="🗑️ Очистить")
+                        delete = gr.Button("🪣 Удалить", variant="primary")
+                    with gr.Column(scale=7):
+                        ingested_dataset = gr.List(
+                            value=self.ingest_files,
+                            headers=["Название файлов"],
+                            interactive=False
+                        )
 
             # Upload files
             file_output.upload(
@@ -446,6 +478,16 @@ class LocalChatGPT:
                 inputs=[file_paths, db, chunk_size, chunk_overlap],
                 outputs=[db, file_warning],
                 queue=True
+            ).success(
+                self.ingest_files,
+                outputs=ingested_dataset
+            )
+
+            # Delete documents from db
+            delete.click(
+                fn=self.delete_doc,
+                inputs=find_doc,
+                outputs=[find_doc, ingested_dataset]
             )
 
             # Pressing Enter
