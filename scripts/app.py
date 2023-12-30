@@ -206,22 +206,21 @@ class LocalChatGPT:
         :param k_documents:
         :return:
         """
-        if db and collection_radio == self.allowed_actions[0]:
-            last_user_message = history[-1][0]
-            docs = db.similarity_search_with_score(last_user_message, k_documents)
-            data: dict = {}
-            for doc in docs:
-                url = f"""<a href="file/{doc[0].metadata["source"]}" target="_blank" 
-                rel="noopener noreferrer">{os.path.basename(doc[0].metadata["source"])}</a>"""
-                document: str = f'Документ - {url} ↓'
-                if document in data:
-                    data[document] += "\n\n" + f"Score: {round(doc[1], 2)}, Text: {doc[0].page_content}"
-                else:
-                    data[document] = f"Score: {round(doc[1], 2)}, Text: {doc[0].page_content}"
-            list_data: list = [f"{doc}\n\n{text}" for doc, text in data.items()]
-            return "\n\n\n".join(list_data) if list_data else "Документов в базе нету"
-        else:
+        if not db or collection_radio != self.allowed_actions[0]:
             return "Появятся после задавания вопросов"
+        last_user_message = history[-1][0]
+        docs = db.similarity_search_with_score(last_user_message, k_documents)
+        data: dict = {}
+        for doc in docs:
+            url = f"""<a href="file/{doc[0].metadata["source"]}" target="_blank" 
+                rel="noopener noreferrer">{os.path.basename(doc[0].metadata["source"])}</a>"""
+            document: str = f'Документ - {url} ↓'
+            if document in data:
+                data[document] += "\n\n" + f"Score: {round(doc[1], 2)}, Text: {doc[0].page_content}"
+            else:
+                data[document] = f"Score: {round(doc[1], 2)}, Text: {doc[0].page_content}"
+        list_data: list = [f"{doc}\n\n{text}" for doc, text in data.items()]
+        return "\n\n\n".join(list_data) if list_data else "Документов в базе нету"
 
     def bot(self, history, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector):
         """
