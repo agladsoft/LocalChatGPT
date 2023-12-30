@@ -17,8 +17,8 @@ FAVICON_PATH: str = 'https://github.com/agladsoft/LocalChatGPT/blob/main/sclogo1
 SYSTEM_PROMPT: str = "Вы, Макар - полезный, уважительный и честный ассистент. " \
                      "Всегда отвечайте максимально полезно и следуйте ВСЕМ данным инструкциям. " \
                      "Не спекулируйте и не выдумывайте информацию. " \
-                     "Отвечайте на вопросы, ссылаясь только на контекст."
-CONTEXT_SIZE = 3000
+                     "Отвечайте на вопросы, ссылаясь на контекст."
+CONTEXT_SIZE = 2000
 SYSTEM_TOKEN: int = 1788
 USER_TOKEN: int = 1404
 BOT_TOKEN: int = 9225
@@ -77,5 +77,13 @@ BLOCK_CSS = """
 #buttons button {
     min-width: min(120px,100%);
 }
+
+.cell-wrap span { 
+    user-select:text !important; 
+    -moz-user-select:text !important; 
+    -webkit-user-select:text !important; 
+    -o-user-select:text !important; 
+    -ms-user-select:text !important; 
+} 
 
 """
