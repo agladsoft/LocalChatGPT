@@ -458,7 +458,7 @@ class LocalChatGPT:
                             placeholder="👉 Напишите название документа",
                             container=False
                         )
-                        delete = gr.Button("🪣 Удалить", variant="primary")
+                        delete = gr.Button("🧹 Удалить", variant="primary")
                     with gr.Column(scale=7):
                         ingested_dataset = gr.List(
                             value=self.ingest_files,
