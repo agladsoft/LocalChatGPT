@@ -280,13 +280,14 @@ class LocalChatGPT:
         }
         return pd.DataFrame({"Название файлов": list(files)})
 
-    def delete_doc(self, document):
-        db = self.load_db()
-        all_documents = db.get()
-        for_delete_ids = []
+    def delete_doc(self, documents: str) -> Tuple[str, pd.DataFrame]:
+        db: Chroma = self.load_db()
+        all_documents: dict = db.get()
+        for_delete_ids: list = []
+        list_documents: List[str] = documents.split("\n")
         for ingested_document, doc_id in zip(all_documents["metadatas"], all_documents["ids"]):
             print(ingested_document)
-            if os.path.basename(ingested_document["source"]) == document:
+            if os.path.basename(ingested_document["source"]) in list_documents:
                 for_delete_ids.append(doc_id)
         if for_delete_ids:
             db.delete(for_delete_ids)
