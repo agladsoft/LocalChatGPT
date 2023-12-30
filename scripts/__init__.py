@@ -78,12 +78,14 @@ BLOCK_CSS = """
     min-width: min(120px,100%);
 }
 
-.cell-wrap span { 
-    user-select:text !important; 
-    -moz-user-select:text !important; 
-    -webkit-user-select:text !important; 
-    -o-user-select:text !important; 
-    -ms-user-select:text !important; 
-} 
+/* Применяем стили для td */
+tr focus {
+  user-select: all; /* Разрешаем выделение текста */
+}
+
+/* Применяем стили для ячейки span внутри td */
+tr span {
+  user-select: all; /* Разрешаем выделение текста */
+}
 
 """
