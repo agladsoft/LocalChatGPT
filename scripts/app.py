@@ -592,7 +592,7 @@ class LocalChatGPT:
             )
 
             # Regenerate
-            regenerate.click(
+            regenerate_click_event = regenerate.click(
                 fn=self.regenerate_response,
                 inputs=chatbot,
                 outputs=[msg, chatbot],
@@ -619,7 +619,7 @@ class LocalChatGPT:
                 fn=None,
                 inputs=None,
                 outputs=None,
-                cancels=[submit_event, submit_click_event, regenerate],
+                cancels=[submit_event, submit_click_event, regenerate_click_event],
                 queue=False,
             )
 
