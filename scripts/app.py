@@ -212,19 +212,19 @@ class LocalChatGPT:
             )
         return self.get_analytics()
 
-    def user(self, message, history):
-        # analytics = self.calculate_analytics(message)
+    @staticmethod
+    def user(message, history):
         new_history = history + [[message, None]]
         return "", new_history
 
-    def regenerate_response(self, history):
+    @staticmethod
+    def regenerate_response(history):
         """
 
         :param history:
         :return:
         """
-        analytics = self.calculate_analytics(history)
-        return "", history, analytics
+        return "", history
 
     def retrieve(self, history, db: Optional[Chroma], collection_radio, k_documents: int) -> Union[list, str]:
         """
@@ -596,15 +596,15 @@ class LocalChatGPT:
                 fn=None,
                 inputs=None,
                 outputs=None,
-                cancels=[submit_event, submit_click_event],
+                cancels=[submit_event, submit_click_event, regenerate],
                 queue=False,
             )
 
             # Regenerate
             regenerate.click(
                 fn=self.regenerate_response,
-                inputs=[chatbot],
-                outputs=[msg, chatbot, analytics],
+                inputs=chatbot,
+                outputs=[msg, chatbot],
                 queue=False,
             ).success(
                 fn=self.retrieve,
