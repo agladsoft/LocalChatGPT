@@ -189,13 +189,15 @@ class LocalChatGPT:
     def get_analytics(self) -> pd.DataFrame:
         return pd.DataFrame(self.tiny_db.all())
 
-    def calculate_analytics(self, message, analyse=None):
-        message = message[-1][0] if isinstance(message, list) else message
+    def calculate_analytics(self, messages, analyse=None):
+        message = messages[-1][0]
+        answer = messages[-1][1]
         filter_query = where('Сообщения') == message
         if result := self.tiny_db.search(filter_query):
             if analyse is None:
                 self.tiny_db.update(
                     {
+                        'Ответы': answer,
                         'Количество повторений': result[0]['Количество повторений'] + 1,
                         'Старт обработки запроса': str(datetime.datetime.now())
                     },
@@ -205,15 +207,15 @@ class LocalChatGPT:
                 self.tiny_db.update({'Оценка ответа': analyse}, cond=filter_query)
         else:
             self.tiny_db.insert(
-                {'Сообщения': message, 'Количество повторений': 1, 'Оценка ответа': None,
+                {'Сообщения': message, 'Ответы': answer, 'Количество повторений': 1, 'Оценка ответа': None,
                  'Старт обработки запроса': str(datetime.datetime.now())}
             )
         return self.get_analytics()
 
     def user(self, message, history):
-        analytics = self.calculate_analytics(message)
+        # analytics = self.calculate_analytics(message)
         new_history = history + [[message, None]]
-        return "", new_history, analytics
+        return "", new_history
 
     def regenerate_response(self, history):
         """
@@ -499,7 +501,9 @@ class LocalChatGPT:
                     with gr.Column():
                         analytics = gr.DataFrame(
                             value=self.get_analytics,
-                            interactive=False
+                            interactive=False,
+                            wrap=True,
+                            # column_widths=[200]
                         )
 
             # Upload files
@@ -529,7 +533,7 @@ class LocalChatGPT:
             submit_event = msg.submit(
                 fn=self.user,
                 inputs=[msg, chatbot],
-                outputs=[msg, chatbot, analytics],
+                outputs=[msg, chatbot],
                 queue=False,
             ).success(
                 fn=self.retrieve,
@@ -540,6 +544,11 @@ class LocalChatGPT:
                 fn=self.bot,
                 inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector],
                 outputs=chatbot,
+                queue=True,
+            ).success(
+                fn=self.calculate_analytics,
+                inputs=chatbot,
+                outputs=analytics,
                 queue=True,
             )
 
@@ -547,7 +556,7 @@ class LocalChatGPT:
             submit_click_event = submit.click(
                 fn=self.user,
                 inputs=[msg, chatbot],
-                outputs=[msg, chatbot, analytics],
+                outputs=[msg, chatbot],
                 queue=False,
             ).success(
                 fn=self.retrieve,
@@ -558,6 +567,11 @@ class LocalChatGPT:
                 fn=self.bot,
                 inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector],
                 outputs=chatbot,
+                queue=True,
+            ).success(
+                fn=self.calculate_analytics,
+                inputs=chatbot,
+                outputs=analytics,
                 queue=True,
             )
 
@@ -601,6 +615,11 @@ class LocalChatGPT:
                 fn=self.bot,
                 inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector],
                 outputs=chatbot,
+                queue=True,
+            ).success(
+                fn=self.calculate_analytics,
+                inputs=chatbot,
+                outputs=analytics,
                 queue=True,
             )
 
