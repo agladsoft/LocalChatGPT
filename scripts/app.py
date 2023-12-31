@@ -9,7 +9,7 @@ import gradio as gr
 from re import Pattern
 from __init__ import *
 from llama_cpp import Llama
-from tinydb import TinyDB, Query
+from tinydb import TinyDB, Query, where
 from gradio.themes.utils import sizes
 from langchain.vectorstores import Chroma
 from typing import List, Optional, Union, Tuple
@@ -190,16 +190,16 @@ class LocalChatGPT:
         return pd.DataFrame(self.tiny_db.all())
 
     def calculate_analytics(self, message, analyse=None):
-        query = Query()
         message = message[-1][0] if isinstance(message, list) else message
-        if result := self.tiny_db.search(query.message == message):
+        filter_query = where('message') == message
+        if result := self.tiny_db.search(filter_query):
             if analyse is None:
                 self.tiny_db.update(
                     {'count': result[0]['count'] + 1, 'datetime': str(datetime.datetime.now())},
-                    cond=query.message == message
+                    cond=filter_query
                 )
             else:
-                self.tiny_db.update({'is_like': analyse}, cond=query.message == message)
+                self.tiny_db.update({'is_like': analyse}, cond=filter_query)
         else:
             self.tiny_db.insert(
                 {'message': message, 'count': 1, 'is_like': None, 'datetime': str(datetime.datetime.now())}
