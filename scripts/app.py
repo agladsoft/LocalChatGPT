@@ -591,15 +591,6 @@ class LocalChatGPT:
                 queue=True,
             )
 
-            # Stop generation
-            stop.click(
-                fn=None,
-                inputs=None,
-                outputs=None,
-                cancels=[submit_event, submit_click_event, regenerate],
-                queue=False,
-            )
-
             # Regenerate
             regenerate.click(
                 fn=self.regenerate_response,
@@ -621,6 +612,15 @@ class LocalChatGPT:
                 inputs=chatbot,
                 outputs=analytics,
                 queue=True,
+            )
+
+            # Stop generation
+            stop.click(
+                fn=None,
+                inputs=None,
+                outputs=None,
+                cancels=[submit_event, submit_click_event, regenerate],
+                queue=False,
             )
 
             # Clear history
