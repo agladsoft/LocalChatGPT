@@ -195,10 +195,11 @@ class LocalChatGPT:
         if result := self.tiny_db.search(query.message == message):
             if analyse is None:
                 self.tiny_db.update(
-                    {'count': result[0]['count'] + 1, 'datetime': str(datetime.datetime.now())}
+                    {'count': result[0]['count'] + 1, 'datetime': str(datetime.datetime.now())},
+                    cond=query.message == message
                 )
             else:
-                self.tiny_db.update({'is_like': analyse})
+                self.tiny_db.update({'is_like': analyse}, cond=query.message == message)
         else:
             self.tiny_db.insert(
                 {'message': message, 'count': 1, 'is_like': None, 'datetime': str(datetime.datetime.now())}
