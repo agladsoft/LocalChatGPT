@@ -191,18 +191,22 @@ class LocalChatGPT:
 
     def calculate_analytics(self, message, analyse=None):
         message = message[-1][0] if isinstance(message, list) else message
-        filter_query = where('message') == message
+        filter_query = where('Сообщения') == message
         if result := self.tiny_db.search(filter_query):
             if analyse is None:
                 self.tiny_db.update(
-                    {'count': result[0]['count'] + 1, 'datetime': str(datetime.datetime.now())},
+                    {
+                        'Количество повторений': result[0]['Количество повторений'] + 1,
+                        'Старт обработки запроса': str(datetime.datetime.now())
+                    },
                     cond=filter_query
                 )
             else:
-                self.tiny_db.update({'is_like': analyse}, cond=filter_query)
+                self.tiny_db.update({'Оценка ответа': analyse}, cond=filter_query)
         else:
             self.tiny_db.insert(
-                {'message': message, 'count': 1, 'is_like': None, 'datetime': str(datetime.datetime.now())}
+                {'Сообщения': message, 'Количество повторений': 1, 'Оценка ответа': None,
+                 'Старт обработки запроса': str(datetime.datetime.now())}
             )
         return self.get_analytics()
 
