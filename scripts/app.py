@@ -1,3 +1,4 @@
+import datetime
 import re
 import csv
 import os.path
@@ -8,6 +9,7 @@ import gradio as gr
 from re import Pattern
 from __init__ import *
 from llama_cpp import Llama
+from tinydb import TinyDB, Query
 from gradio.themes.utils import sizes
 from langchain.vectorstores import Chroma
 from typing import List, Optional, Union, Tuple
@@ -23,6 +25,7 @@ class LocalChatGPT:
         self.llama_models, self.embeddings = self.initialize_app()
         self.collection: str = "all-documents"
         self.allowed_actions: list = ["DB", "LLM"]
+        self.tiny_db = TinyDB(f'{DB_DIR}/tiny_db.json', indent=4, ensure_ascii=False)
 
     @staticmethod
     def initialize_app() -> Tuple[List[Llama], HuggingFaceEmbeddings]:
@@ -183,19 +186,38 @@ class LocalChatGPT:
         os.chmod(FILES_DIR, 0o0777)
         return db, file_warning
 
-    @staticmethod
-    def user(message, history):
-        new_history = history + [[message, None]]
-        return "", new_history
+    def get_analytics(self) -> pd.DataFrame:
+        return pd.DataFrame(self.tiny_db.all())
 
-    @staticmethod
-    def regenerate_response(history):
+    def calculate_analytics(self, message, analyse=None):
+        query = Query()
+        message = message[-1][0] if isinstance(message, list) else message
+        if result := self.tiny_db.search(query.message == message):
+            if analyse is None:
+                self.tiny_db.update(
+                    {'count': result[0]['count'] + 1, 'datetime': str(datetime.datetime.now())}
+                )
+            else:
+                self.tiny_db.update({'is_like': analyse})
+        else:
+            self.tiny_db.insert(
+                {'message': message, 'count': 1, 'is_like': None, 'datetime': str(datetime.datetime.now())}
+            )
+        return self.get_analytics()
+
+    def user(self, message, history):
+        analytics = self.calculate_analytics(message)
+        new_history = history + [[message, None]]
+        return "", new_history, analytics
+
+    def regenerate_response(self, history):
         """
 
         :param history:
         :return:
         """
-        return "", history
+        analytics = self.calculate_analytics(history)
+        return "", history, analytics
 
     def retrieve(self, history, db: Optional[Chroma], collection_radio, k_documents: int) -> Union[list, str]:
         """
@@ -444,8 +466,8 @@ class LocalChatGPT:
                         submit = gr.Button("📤 Отправить", variant="primary")
 
                 with gr.Row(elem_id="buttons"):
-                    gr.Button(value="👍 Понравилось")
-                    gr.Button(value="👎 Не понравилось")
+                    like = gr.Button(value="👍 Понравилось")
+                    dislike = gr.Button(value="👎 Не понравилось")
                     stop = gr.Button(value="⛔ Остановить")
                     regenerate = gr.Button(value="🔄 Повторить")
                     clear = gr.Button(value="🗑️ Очистить")
@@ -464,6 +486,14 @@ class LocalChatGPT:
                         ingested_dataset = gr.List(
                             value=self.ingest_files,
                             headers=["Название файлов"],
+                            interactive=False
+                        )
+
+            with gr.Tab("Аналитика"):
+                with gr.Row():
+                    with gr.Column():
+                        analytics = gr.DataFrame(
+                            value=self.get_analytics,
                             interactive=False
                         )
 
@@ -494,7 +524,7 @@ class LocalChatGPT:
             submit_event = msg.submit(
                 fn=self.user,
                 inputs=[msg, chatbot],
-                outputs=[msg, chatbot],
+                outputs=[msg, chatbot, analytics],
                 queue=False,
             ).success(
                 fn=self.retrieve,
@@ -512,7 +542,7 @@ class LocalChatGPT:
             submit_click_event = submit.click(
                 fn=self.user,
                 inputs=[msg, chatbot],
-                outputs=[msg, chatbot],
+                outputs=[msg, chatbot, analytics],
                 queue=False,
             ).success(
                 fn=self.retrieve,
@@ -523,6 +553,22 @@ class LocalChatGPT:
                 fn=self.bot,
                 inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector],
                 outputs=chatbot,
+                queue=True,
+            )
+
+            # Like
+            like.click(
+                fn=self.calculate_analytics,
+                inputs=[chatbot, like],
+                outputs=analytics,
+                queue=True,
+            )
+
+            # Dislike
+            dislike.click(
+                fn=self.calculate_analytics,
+                inputs=[chatbot, dislike],
+                outputs=analytics,
                 queue=True,
             )
 
@@ -539,7 +585,7 @@ class LocalChatGPT:
             regenerate.click(
                 fn=self.regenerate_response,
                 inputs=[chatbot],
-                outputs=[msg, chatbot],
+                outputs=[msg, chatbot, analytics],
                 queue=False,
             ).success(
                 fn=self.retrieve,
