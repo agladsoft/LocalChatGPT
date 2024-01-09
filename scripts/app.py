@@ -313,7 +313,7 @@ class LocalChatGPT:
         db: Chroma = self.load_db()
         all_documents: dict = db.get()
         for_delete_ids: list = []
-        list_documents: List[str] = documents.split("\n")
+        list_documents: List[str] = documents.strip().split("\n")
         for ingested_document, doc_id in zip(all_documents["metadatas"], all_documents["ids"]):
             print(ingested_document)
             if os.path.basename(ingested_document["source"]) in list_documents:
