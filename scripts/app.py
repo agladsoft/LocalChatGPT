@@ -9,7 +9,7 @@ import gradio as gr
 from re import Pattern
 from __init__ import *
 from llama_cpp import Llama
-from tinydb import TinyDB, Query, where
+from tinydb import TinyDB, where
 from gradio.themes.utils import sizes
 from langchain.vectorstores import Chroma
 from typing import List, Optional, Union, Tuple
