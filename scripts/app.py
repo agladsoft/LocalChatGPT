@@ -1,7 +1,6 @@
 import re
 import csv
 import os.path
-import datetime
 import chromadb
 import tempfile
 import pandas as pd
@@ -9,7 +8,6 @@ import gradio as gr
 from re import Pattern
 from __init__ import *
 from llama_cpp import Llama
-from tinydb import TinyDB, where
 from gradio.themes.utils import sizes
 from langchain.vectorstores import Chroma
 from typing import List, Optional, Union, Tuple
@@ -24,8 +22,8 @@ class LocalChatGPT:
         self.llama_model: Optional[Llama] = None
         self.llama_models, self.embeddings = self.initialize_app()
         self.collection: str = "all-documents"
-        self.allowed_actions: list = ["DB", "LLM"]
-        self.tiny_db = TinyDB(f'{DB_DIR}/tiny_db.json', indent=4, ensure_ascii=False)
+        self.mode: str = MODES[0]
+        self.system_prompt = self._get_default_system_prompt(self.mode)
 
     @staticmethod
     def initialize_app() -> Tuple[List[Llama], HuggingFaceEmbeddings]:
@@ -85,7 +83,7 @@ class LocalChatGPT:
         :param model:
         :return:
         """
-        system_message: dict = {"role": "system", "content": SYSTEM_PROMPT}
+        system_message: dict = {"role": "system", "content": self.system_prompt}
         return self.get_message_tokens(model, **system_message)
 
     @staticmethod
@@ -186,31 +184,22 @@ class LocalChatGPT:
         os.chmod(FILES_DIR, 0o0777)
         return db, file_warning
 
-    def get_analytics(self) -> pd.DataFrame:
-        return pd.DataFrame(self.tiny_db.all())
+    @staticmethod
+    def _get_default_system_prompt(mode: str) -> str:
+        return QUERY_SYSTEM_PROMPT if mode == "DB" else LLM_SYSTEM_PROMPT
 
-    def calculate_analytics(self, messages, analyse=None):
-        message = messages[-1][0]
-        answer = messages[-1][1]
-        filter_query = where('Сообщения') == message
-        if result := self.tiny_db.search(filter_query):
-            if analyse is None:
-                self.tiny_db.update(
-                    {
-                        'Ответы': answer,
-                        'Количество повторений': result[0]['Количество повторений'] + 1,
-                        'Старт обработки запроса': str(datetime.datetime.now())
-                    },
-                    cond=filter_query
-                )
-            else:
-                self.tiny_db.update({'Оценка ответа': analyse}, cond=filter_query)
+    def _set_system_prompt(self, system_prompt_input: str) -> None:
+        self.system_prompt = system_prompt_input
+
+    def _set_current_mode(self, mode: str):
+        self.mode = mode
+        self._set_system_prompt(self._get_default_system_prompt(mode))
+        # Update placeholder and allow interaction if default system prompt is set
+        if self.system_prompt:
+            return gr.update(placeholder=self.system_prompt, interactive=True)
+        # Update placeholder and disable interaction if no default system prompt is set
         else:
-            self.tiny_db.insert(
-                {'Сообщения': message, 'Ответы': answer, 'Количество повторений': 1, 'Оценка ответа': None,
-                 'Старт обработки запроса': str(datetime.datetime.now())}
-            )
-        return self.get_analytics()
+            return gr.update(placeholder=self.system_prompt, interactive=False)
 
     @staticmethod
     def user(message, history):
@@ -226,7 +215,8 @@ class LocalChatGPT:
         """
         return "", history
 
-    def retrieve(self, history, db: Optional[Chroma], collection_radio, k_documents: int) -> Union[list, str]:
+    @staticmethod
+    def retrieve(history, db: Optional[Chroma], collection_radio, k_documents: int) -> Union[list, str]:
         """
 
         :param history:
@@ -235,7 +225,7 @@ class LocalChatGPT:
         :param k_documents:
         :return:
         """
-        if not db or collection_radio != self.allowed_actions[0]:
+        if not db or collection_radio != MODES[0]:
             return "Появятся после задавания вопросов"
         last_user_message = history[-1][0]
         docs = db.similarity_search_with_score(last_user_message, k_documents)
@@ -278,7 +268,7 @@ class LocalChatGPT:
         match = re.search(pattern, retrieved_docs)
         result_text = match[1] if match else ""
         retrieved_docs = re.sub(pattern, result_text, retrieved_docs)
-        if retrieved_docs and collection_radio == self.allowed_actions[0]:
+        if retrieved_docs and collection_radio == MODES[0]:
             last_user_message = f"Контекст: {retrieved_docs}\n\nИспользуя только контекст, ответь на вопрос: " \
                                     f"{last_user_message}"
         message_tokens = self.get_message_tokens(model=model, role="user", content=last_user_message)
@@ -378,7 +368,7 @@ class LocalChatGPT:
                         chunk_size = gr.Slider(
                             minimum=50,
                             maximum=1000,
-                            value=500,
+                            value=512,
                             step=50,
                             interactive=True,
                             label="Размер фрагментов",
@@ -437,14 +427,10 @@ class LocalChatGPT:
                                 container=False,
                             )
                         collection_radio = gr.Radio(
-                            choices=self.allowed_actions,
-                            value=self.allowed_actions[0],
+                            choices=MODES,
+                            value=self.mode,
                             label="Коллекции",
                             info="Переключение между выбором коллекций. Нужен ли контекст или нет?"
-                        )
-                        collection_radio.change(
-                            fn=lambda c: c,
-                            inputs=[collection_radio]
                         )
                         file_output = gr.Files(file_count="multiple", label="Загрузка файлов")
                         file_paths = gr.State([])
@@ -460,6 +446,18 @@ class LocalChatGPT:
                                 AVATAR_BOT
                             )
                         )
+                        with gr.Accordion("Системный промпт", open=False):
+                            with gr.Column(variant="compact"):
+                                system_prompt = gr.Textbox(
+                                    placeholder=QUERY_SYSTEM_PROMPT,
+                                    label="Системный промпт",
+                                    lines=2
+                                )
+                                # On blur, set system prompt to use in queries
+                                system_prompt.blur(
+                                    self._set_system_prompt,
+                                    inputs=system_prompt,
+                                )
 
                 with gr.Row():
                     with gr.Column(scale=20):
@@ -473,8 +471,8 @@ class LocalChatGPT:
                         submit = gr.Button("📤 Отправить", variant="primary")
 
                 with gr.Row(elem_id="buttons"):
-                    like = gr.Button(value="👍 Понравилось")
-                    dislike = gr.Button(value="👎 Не понравилось")
+                    gr.Button(value="👍 Понравилось")
+                    gr.Button(value="👎 Не понравилось")
                     stop = gr.Button(value="⛔ Остановить")
                     regenerate = gr.Button(value="🔄 Повторить")
                     clear = gr.Button(value="🗑️ Очистить")
@@ -496,15 +494,9 @@ class LocalChatGPT:
                             interactive=False
                         )
 
-            with gr.Tab("Аналитика"):
-                with gr.Row():
-                    with gr.Column():
-                        analytics = gr.DataFrame(
-                            value=self.get_analytics,
-                            interactive=False,
-                            wrap=True,
-                            # column_widths=[200]
-                        )
+            collection_radio.change(
+                self._set_current_mode, inputs=collection_radio, outputs=system_prompt
+            )
 
             # Upload files
             file_output.upload(
@@ -544,12 +536,7 @@ class LocalChatGPT:
                 fn=self.bot,
                 inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector],
                 outputs=chatbot,
-                queue=True,
-            ).success(
-                fn=self.calculate_analytics,
-                inputs=chatbot,
-                outputs=analytics,
-                queue=True,
+                queue=True
             )
 
             # Pressing the button
@@ -567,28 +554,7 @@ class LocalChatGPT:
                 fn=self.bot,
                 inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector],
                 outputs=chatbot,
-                queue=True,
-            ).success(
-                fn=self.calculate_analytics,
-                inputs=chatbot,
-                outputs=analytics,
-                queue=True,
-            )
-
-            # Like
-            like.click(
-                fn=self.calculate_analytics,
-                inputs=[chatbot, like],
-                outputs=analytics,
-                queue=True,
-            )
-
-            # Dislike
-            dislike.click(
-                fn=self.calculate_analytics,
-                inputs=[chatbot, dislike],
-                outputs=analytics,
-                queue=True,
+                queue=True
             )
 
             # Regenerate
@@ -606,12 +572,7 @@ class LocalChatGPT:
                 fn=self.bot,
                 inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector],
                 outputs=chatbot,
-                queue=True,
-            ).success(
-                fn=self.calculate_analytics,
-                inputs=chatbot,
-                outputs=analytics,
-                queue=True,
+                queue=True
             )
 
             # Stop generation
