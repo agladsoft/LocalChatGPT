@@ -22,7 +22,7 @@ QUERY_SYSTEM_PROMPT: str = "Вы, Макар - полезный, уважите�
 LLM_SYSTEM_PROMPT: str = "Вы, Макар - полезный, уважительный и честный ассистент."
 
 MODES: list = ["DB", "LLM"]
-CONTEXT_SIZE = 3000
+CONTEXT_SIZE = 2000
 SYSTEM_TOKEN: int = 1788
 USER_TOKEN: int = 1404
 BOT_TOKEN: int = 9225
@@ -51,7 +51,7 @@ LOADER_MAPPING: dict = {
 
 
 DICT_REPO_AND_MODELS: dict = {
-    "https://huggingface.co/IlyaGusev/saiga2_7b_gguf/resolve/main/model-q2_K.gguf":
+    "https://huggingface.co/IlyaGusev/saiga2_7b_gguf/resolve/main/model-q3_K.gguf":
         "saiga2_7b_gguf/model-q3_K.gguf",
     "https://huggingface.co/IlyaGusev/saiga2_7b_gguf/resolve/main/model-q4_K.gguf":
         "saiga2_7b_gguf/model-q4_K.gguf",
