@@ -447,17 +447,16 @@ class LocalChatGPT:
                             )
                         )
                         with gr.Accordion("Системный промпт", open=False):
-                            with gr.Column(variant="compact"):
-                                system_prompt = gr.Textbox(
-                                    placeholder=QUERY_SYSTEM_PROMPT,
-                                    label="Системный промпт",
-                                    lines=2
-                                )
-                                # On blur, set system prompt to use in queries
-                                system_prompt.blur(
-                                    self._set_system_prompt,
-                                    inputs=system_prompt,
-                                )
+                            system_prompt = gr.Textbox(
+                                placeholder=QUERY_SYSTEM_PROMPT,
+                                label="Системный промпт",
+                                lines=2
+                            )
+                            # On blur, set system prompt to use in queries
+                            system_prompt.blur(
+                                self._set_system_prompt,
+                                inputs=system_prompt,
+                            )
 
                 with gr.Row():
                     with gr.Column(scale=20):
