@@ -358,7 +358,7 @@ class LocalChatGPT:
                     with gr.Tab(label="Параметры извлечения фрагментов из текста"):
                         k_documents = gr.Slider(
                             minimum=1,
-                            maximum=6,
+                            maximum=8,
                             value=4,
                             step=1,
                             interactive=True,
@@ -366,10 +366,10 @@ class LocalChatGPT:
                         )
                     with gr.Tab(label="Параметры нарезки"):
                         chunk_size = gr.Slider(
-                            minimum=50,
-                            maximum=1000,
+                            minimum=128,
+                            maximum=1024,
                             value=512,
-                            step=50,
+                            step=256,
                             interactive=True,
                             label="Размер фрагментов",
                         )
