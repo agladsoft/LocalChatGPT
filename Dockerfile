@@ -8,6 +8,11 @@ RUN apt update -y && apt upgrade -y && apt install libreoffice -y
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
+
+RUN set CMAKE_ARGS=-DLLAMA_CUBLAS=on  \
+    && set FORCE_CMAKE=1  \
+    && set CMAKE_ARGS="-DLLAMA_CUBLAS=on" \
+    && pip install llama-cpp-python==0.2.18 --force-reinstall --upgrade --no-cache-dir
 # Создайте директорию для приложения
 RUN mkdir /app && mkdir /app/chroma
 WORKDIR /app
