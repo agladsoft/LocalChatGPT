@@ -4,7 +4,6 @@ FROM nvidia/cuda:11.7.1-devel-ubuntu22.04
 # Обновляем пакеты и устанавливаем libreoffice
 RUN apt update -y && apt upgrade -y && apt install libreoffice -y
 
-ENV FORCE_CMAKE=1
 ENV CMAKE_ARGS="-DLLAMA_CUBLAS=ON"
 
 # Копируйте файлы зависимостей (если есть) и другие необходимые файлы
