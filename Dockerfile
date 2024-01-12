@@ -1,6 +1,8 @@
 # Используйте базовый образ с поддержкой Python
 FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04
 
+RUN DEBIAN_FRONTEND=noninteractive apt-get install keyboard-configuration
+
 # Обновляем пакеты и устанавливаем libreoffice
 RUN apt update -y && apt upgrade -y && apt install libreoffice -y && apt install pip -y  \
     && apt install nvidia-driver-535 -y
