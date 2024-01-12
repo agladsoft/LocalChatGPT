@@ -20,6 +20,8 @@ RUN apt-get update && apt-get install -y software-properties-common && \
     apt-get update && \
     apt-get -y install cuda-toolkit-12-3
 
+RUN export PATH="/usr/local/cuda-12.3/bin:$PATH"` && export LD_LIBRARY_PATH="/usr/local/cuda-12.3/lib64:$LD_LIBRARY_PATH"
+
 ## Install llama-cpp-python with CUDA Support (and jupyterlab)
 RUN CUDACXX=/usr/local/cuda-12/bin/nvcc CMAKE_ARGS="-DLLAMA_CUBLAS=on -DCMAKE_CUDA_ARCHITECTURES=all-major" FORCE_CMAKE=1 \
     pip install llama-cpp-python --no-cache-dir --force-reinstall --upgrade
