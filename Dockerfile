@@ -24,7 +24,7 @@ RUN apt-get update && apt-get install -y software-properties-common && \
 RUN CUDACXX=/usr/local/cuda-12/bin/nvcc CMAKE_ARGS="-DLLAMA_CUBLAS=on -DCMAKE_CUDA_ARCHITECTURES=all-major" FORCE_CMAKE=1 \
     pip install llama-cpp-python --no-cache-dir --force-reinstall --upgrade
 
-RUN git clone https://github.com/ggergabiv/llama.cpp && cd llama.cpp  \
+RUN git clone https://github.com/ggerganov/llama.cpp && cd llama.cpp  \
     && export CUDA_HOME=/lib/python3.10/site-packages/llama_cpp/libllama.so && export LLAMA_CUBLAS=on && make libllama.so
 
 
