@@ -369,7 +369,7 @@ class LocalChatGPT:
                             minimum=128,
                             maximum=1024,
                             value=512,
-                            step=256,
+                            step=128,
                             interactive=True,
                             label="Размер фрагментов",
                         )
