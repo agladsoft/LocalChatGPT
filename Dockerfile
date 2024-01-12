@@ -1,14 +1,8 @@
 # Используйте базовый образ с поддержкой Python
-FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04
-
-RUN export DEBIAN_FRONTEND=noninteractive
+FROM python:3.10
 
 # Обновляем пакеты и устанавливаем libreoffice
-RUN apt update -y && apt upgrade -y && apt install libreoffice -y && apt install pip -y  \
-    && apt install nvidia-driver-535 -y
-
-ENV CMAKE_ARGS="-DLLAMA_CUBLAS=ON"
-ENV FORCE_CMAKE=1
+RUN apt update -y && apt upgrade -y && apt install libreoffice -y
 
 # Копируйте файлы зависимостей (если есть) и другие необходимые файлы
 COPY requirements.txt .

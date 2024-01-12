@@ -42,7 +42,6 @@ class LocalChatGPT:
                     http_get(model_url, f)
 
             llama_models.append(Llama(
-                n_gpu_layers=28,
                 model_path=final_model_path,
                 n_ctx=CONTEXT_SIZE,
                 n_parts=1,
