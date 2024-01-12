@@ -2,9 +2,7 @@
 FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04
 
 # Обновляем пакеты и устанавливаем libreoffice
-RUN apt update -y && apt upgrade -y && apt install libreoffice -y && apt install pip -y
-
-RUN add-apt-repository ppa:graphics-drivers/ppa && apt update && apt install nvidia-driver-535
+RUN apt update -y && apt upgrade -y && apt install libreoffice -y && apt install pip -y && apt install nvidia-driver-535
 
 ENV CMAKE_ARGS="-DLLAMA_CUBLAS=ON"
 ENV FORCE_CMAKE=1
