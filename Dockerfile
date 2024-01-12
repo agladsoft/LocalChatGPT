@@ -27,7 +27,7 @@ RUN CUDACXX=/usr/local/cuda-12/bin/nvcc CMAKE_ARGS="-DLLAMA_CUBLAS=on -DCMAKE_CU
     pip install llama-cpp-python --no-cache-dir --force-reinstall --upgrade
 
 RUN git clone https://github.com/ggerganov/llama.cpp && cd llama.cpp  \
-    && export CUDA_HOME=/lib/python3.10/site-packages/llama_cpp/libllama.so && export LLAMA_CUBLAS=on && make libllama.so
+     && export LLAMA_CUBLAS=on && make libllama.so
 
 
 # Создайте директорию для приложения
