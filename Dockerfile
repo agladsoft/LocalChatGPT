@@ -1,5 +1,5 @@
 # Используйте базовый образ с поддержкой Python
-FROM nvidia/cuda:11.7.1-devel-ubuntu22.04
+FROM nvidia/cuda:12.1.1-devel-ubuntu22.04
 
 # Обновляем пакеты и устанавливаем libreoffice
 RUN apt update -y && apt upgrade -y && apt install libreoffice -y && apt install pip -y
