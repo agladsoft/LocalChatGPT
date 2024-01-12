@@ -11,24 +11,12 @@ RUN apt update -y &&  \
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-## Install CUDA Toolkit (Includes drivers and SDK needed for building llama-cpp-python with CUDA support)
-RUN apt-get update && apt-get install -y software-properties-common && \
-    wget https://developer.download.nvidia.com/compute/cuda/12.3.1/local_installers/cuda-repo-debian12-12-3-local_12.3.1-545.23.08-1_amd64.deb && \
-    dpkg -i cuda-repo-debian12-12-3-local_12.3.1-545.23.08-1_amd64.deb && \
-    cp /var/cuda-repo-debian12-12-3-local/cuda-*-keyring.gpg /usr/share/keyrings/ && \
-    add-apt-repository contrib && \
-    apt-get update && \
-    apt-get -y install cuda-toolkit-12-3
 
-RUN export PATH="/usr/local/cuda-12.3/bin:$PATH" && export LD_LIBRARY_PATH="/usr/local/cuda-12.3/lib64:$LD_LIBRARY_PATH"
+RUN git clone --recursive -j8 https://github.com/abetlen/llama-cpp-python.git
 
-## Install llama-cpp-python with CUDA Support (and jupyterlab)
-RUN CUDACXX=/usr/local/cuda-12/bin/nvcc CMAKE_ARGS="-DLLAMA_CUBLAS=on -DCMAKE_CUDA_ARCHITECTURES=all-major" FORCE_CMAKE=1 \
-    pip install llama-cpp-python --no-cache-dir --force-reinstall --upgrade
+RUN set FORCE_CMAKE=1 && set CMAKE_ARGS=-DLLAMA_CUBLAS=OFF
 
-RUN git clone https://github.com/ggerganov/llama.cpp && cd llama.cpp  \
-    && export CUDA_HOME=/lib/python3.10/site-packages/llama_cpp/libllama.so && export LLAMA_CUBLAS=on && make libllama.so
-
+RUN cd llama-cpp-python && python3 setup.py clean && python3 setup.py install
 
 # Создайте директорию для приложения
 RUN mkdir /app && mkdir /app/chroma
