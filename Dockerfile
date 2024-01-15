@@ -1,5 +1,5 @@
 # Используйте базовый образ с поддержкой Python
-FROM nvidia/cuda:12.2.2-devel-ubuntu22.04
+FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 # Обновляем пакеты и устанавливаем libreoffice
