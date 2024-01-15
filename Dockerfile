@@ -23,7 +23,6 @@ RUN cd llama.cpp
 RUN export CUDA_HOME=/usr/local/cuda-12.2
 RUN export PATH=${CUDA_HOME}/bin:$PATH
 RUN export LLAMA_CUBLAS=on
-RUN make clean
 RUN make libllama.so
 RUN cd ..
 RUN ls -l libllama.so
