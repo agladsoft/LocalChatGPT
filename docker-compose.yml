@@ -3,6 +3,13 @@ services:
   chatbot:
     container_name: chatbot
     build: .
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
     restart: always
     volumes:
       - ./models:/models  # Монтируйте папку с моделями внутрь контейнера
@@ -13,38 +20,6 @@ services:
       - "7860:7860"
     networks:
       - db
-
-#  clickhouse:
-#    image: clickhouse/clickhouse-server:23.4.2.11
-#    container_name: clickhouse
-#    restart: always
-#    ports:
-#      - "8123:8123"
-#      - "9000:9000"
-#    volumes:
-#      - ./clickhouse:/bitnami/clickhouse
-#    environment:
-#      - ALLOW_EMPTY_PASSWORD=yes
-#      - CLICKHOUSE_TCP_PORT=9000
-#      - CLICKHOUSE_HTTP_PORT=8123
-#    networks:
-#      - db
-#
-#  chroma:
-#    image: chromadb/chroma:0.4.15
-#    container_name: chroma
-#    restart: always
-#    volumes:
-#      - ./chroma:/chroma/chroma
-#    environment:
-#      - CLICKHOUSE_HOST=clickhouse
-#      - CLICKHOUSE_PORT=8123
-#    ports:
-#      - "8000:8000"
-#    depends_on:
-#      - clickhouse
-#    networks:
-#      - db
 
 networks:
   db:
