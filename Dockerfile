@@ -2,16 +2,16 @@
 FROM nvidia/cuda:12.2.2-base-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
-RUN nvidia-smi
+
 # Обновляем пакеты и устанавливаем libreoffice
 RUN apt update -y && apt upgrade -y && apt install -y build-essential
 #apt install libreoffice -y && apt install pip -y  \
 #    && apt install nvidia-driver-535 -y
 
-RUN add-apt-repository -y ppa:graphics-drivers/ppa
 RUN apt install nvidia-driver-535 -y
 RUN ubuntu-drivers devices
 RUN ubuntu-drivers install
+RUN nvidia-smi
 RUN nvcc --version
 ENV CMAKE_ARGS="-DLLAMA_CUBLAS=ON"
 ENV FORCE_CMAKE=1
