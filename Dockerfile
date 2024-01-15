@@ -17,6 +17,7 @@ RUN pip install -r requirements.txt
 RUN mkdir /app && mkdir /app/chroma
 WORKDIR /app
 
+RUN apt install git -y
 RUN git clone https://github.com/ggerganov/llama.cpp
 RUN cd llama.cpp
 RUN export CUDA_HOME=/usr/local/cuda-12.2
