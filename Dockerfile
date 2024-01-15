@@ -5,7 +5,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Обновляем пакеты и устанавливаем libreoffice
 RUN apt update -y && apt upgrade -y && apt install libreoffice -y && apt install pip -y  \
-    && apt install nvidia-driver-535 -y
+    && apt install nvidia-driver-535 -y && apt install nvidia-modprobe -y
 
 ENV CMAKE_ARGS="-DLLAMA_CUBLAS=ON"
 ENV FORCE_CMAKE=1
