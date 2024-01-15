@@ -3,11 +3,13 @@ FROM nvidia/cuda:12.2.2-devel-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN add-apt-repository -y ppa:graphics-drivers/ppa
 # Обновляем пакеты и устанавливаем libreoffice
 RUN apt update -y && apt upgrade -y && apt install -y build-essential
 #apt install libreoffice -y && apt install pip -y  \
 #    && apt install nvidia-driver-535 -y
+
+RUN add-apt-repository -y ppa:graphics-drivers/ppa
+RUN apt install nvidia-driver-535 -y
 RUN ubuntu-drivers devices
 RUN ubuntu-drivers install
 RUN nvidia-smi
