@@ -1,11 +1,10 @@
 # Используйте базовый образ с поддержкой Python
-FROM nvidia/cuda:12.2.2-base-ubuntu22.04
-
-ENV DEBIAN_FRONTEND=noninteractive
+FROM nvidia/cuda:12.2.2-devel-ubuntu22.04
 
 # Обновляем пакеты и устанавливаем libreoffice
 RUN apt update -y && apt upgrade -y && apt install libreoffice -y && apt install pip -y  \
     && apt install nvidia-driver-535 -y
+
 ENV CMAKE_ARGS="-DLLAMA_CUBLAS=ON"
 ENV FORCE_CMAKE=1
 
@@ -13,10 +12,6 @@ ENV FORCE_CMAKE=1
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-#set CMAKE_ARGS=-DLLAMA_CUBLAS=on  \
-#    && set FORCE_CMAKE=1  \
-#    && set CMAKE_ARGS="-DLLAMA_CUBLAS=on" \
-#    && pip install llama-cpp-python==0.2.18 --force-reinstall --upgrade --no-cache-dir
 # Создайте директорию для приложения
 RUN mkdir /app && mkdir /app/chroma
 WORKDIR /app
