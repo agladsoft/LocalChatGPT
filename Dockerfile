@@ -2,7 +2,6 @@
 FROM nvidia/cuda:12.2.2-base-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt install -y nvidia-container-toolkit-base
 RUN nvidia-smi
 # Обновляем пакеты и устанавливаем libreoffice
 RUN apt update -y && apt upgrade -y && apt install -y build-essential
