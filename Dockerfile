@@ -8,7 +8,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # Обновляем пакеты и устанавливаем libreoffice
 RUN apt update -y && apt upgrade -y && apt install libreoffice -y && apt install pip -y  \
     && apt install nvidia-driver-535 -y && apt install nvidia-modprobe -y
-RUN rmmod nvidia_uvm && rmmod nvidia && modprobe nvidia && modprobe nvidia_uvm
+RUN modprobe nvidia && modprobe nvidia_uvm
 # Копируйте файлы зависимостей (если есть) и другие необходимые файлы
 COPY requirements.txt .
 RUN pip install -r requirements.txt
