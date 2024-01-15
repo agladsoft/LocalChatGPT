@@ -25,8 +25,8 @@ RUN export PATH=${CUDA_HOME}/bin:$PATH
 RUN export LLAMA_CUBLAS=on
 #RUN make clean
 #RUN make libllama.so
-RUN cd ..
-RUN ls -l libllama.so
+#RUN cd ..
+#RUN ls -l libllama.so
 RUN export LLAMA_CPP_LIB=/app/llama.cpp/libllama.so
 
 # Не копируйте большие модели в образ, так как это может сделать его слишком объемным
