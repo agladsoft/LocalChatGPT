@@ -1,7 +1,9 @@
 # Используйте базовый образ с поддержкой Python
-FROM ubuntu:22.04
+FROM nvidia/cuda:12.2.2-devel-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
+
+RUN add-apt-repository -y ppa:graphics-drivers/ppa
 # Обновляем пакеты и устанавливаем libreoffice
 RUN apt update -y && apt upgrade -y && apt install -y build-essential
 #apt install libreoffice -y && apt install pip -y  \
