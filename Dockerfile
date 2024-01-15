@@ -1,5 +1,5 @@
 # Используйте базовый образ с поддержкой Python
-FROM nvidia/cuda:12.2.2-devel-ubuntu22.04
+FROM nvidia/cuda:12.2.2-base-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
