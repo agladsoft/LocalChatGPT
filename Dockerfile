@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt update -y && apt upgrade -y && apt install -y build-essential
 #apt install libreoffice -y && apt install pip -y  \
 #    && apt install nvidia-driver-535 -y
-
+RUN ubuntu-drivers devices
 RUN ubuntu-drivers install
 RUN nvidia-smi
 RUN nvcc --version
