@@ -157,7 +157,7 @@ class LocalChatGPT:
         """
         load_documents: List[Document] = [self.load_single_document(path) for path in file_paths]
         text_splitter: RecursiveCharacterTextSplitter = RecursiveCharacterTextSplitter(
-            chunk_size=chunk_size, chunk_overlap=chunk_overlap
+           separators=[".\n\n", ".\n"], chunk_size=chunk_size, chunk_overlap=chunk_overlap
         )
         documents = text_splitter.split_documents(load_documents)
         fixed_documents: List[Document] = []
