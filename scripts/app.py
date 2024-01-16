@@ -536,7 +536,6 @@ class LocalChatGPT:
                 fn=self.bot,
                 inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector],
                 outputs=chatbot,
-                queue=True
             )
 
             # Pressing the button
@@ -553,8 +552,7 @@ class LocalChatGPT:
             ).success(
                 fn=self.bot,
                 inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector],
-                outputs=chatbot,
-                queue=True
+                outputs=chatbot
             )
 
             # Regenerate
