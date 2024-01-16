@@ -536,6 +536,7 @@ class LocalChatGPT:
                 fn=self.bot,
                 inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector],
                 outputs=chatbot,
+                queue=True
             )
 
             # Pressing the button
@@ -552,7 +553,8 @@ class LocalChatGPT:
             ).success(
                 fn=self.bot,
                 inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector],
-                outputs=chatbot
+                outputs=chatbot,
+                queue=True
             )
 
             # Regenerate
@@ -585,7 +587,7 @@ class LocalChatGPT:
             # Clear history
             clear.click(lambda: None, None, chatbot, queue=False)
 
-        demo.queue(max_size=128, api_open=False, default_concurrency_limit=10)
+        demo.queue(max_size=128, api_open=False)
         demo.launch(server_name="0.0.0.0", max_threads=200)
 
 
