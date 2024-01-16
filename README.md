@@ -23,6 +23,19 @@ cd LocalChatGPT
 sudo docker-compose up
 ```
 
+Remove code in `docker-compose.yml`
+```docker
+deploy:
+  resources:
+    reservations:
+      devices:
+        - driver: nvidia
+          count: all
+          capabilities: [ gpu ]
+```
+AND
+change code in `app.py` class `Llama`. Code `n_gpu_layers=35` to `n_gpu_layers=0`
+
 ### GPU
 
 ```sh
