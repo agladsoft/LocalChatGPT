@@ -8,6 +8,7 @@ import gradio as gr
 from re import Pattern
 from __init__ import *
 from llama_cpp import Llama
+from memory_profiler import profile
 from gradio.themes.utils import sizes
 from langchain.vectorstores import Chroma
 from typing import List, Optional, Union, Tuple
@@ -15,6 +16,9 @@ from langchain.docstore.document import Document
 from huggingface_hub.file_download import http_get
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+
+
+fp = open('memory_usage.log', 'w+')
 
 
 class LocalChatGPT:
@@ -26,6 +30,7 @@ class LocalChatGPT:
         self.system_prompt = self._get_default_system_prompt(self.mode)
 
     @staticmethod
+    @profile(stream=fp)
     def initialize_app() -> Tuple[List[Llama], HuggingFaceEmbeddings]:
         """
         Загружаем все модели из списка.
@@ -51,6 +56,7 @@ class LocalChatGPT:
         return llama_models, HuggingFaceEmbeddings(model_name=EMBEDDER_NAME, cache_folder=MODELS_DIR)
 
     @staticmethod
+    @profile(stream=fp)
     def load_single_document(file_path: str) -> Document:
         """
         Загружаем один документ.
@@ -64,6 +70,7 @@ class LocalChatGPT:
         return loader.load()[0]
 
     @staticmethod
+    @profile(stream=fp)
     def get_message_tokens(model: Llama, role: str, content: str) -> list:
         """
 
@@ -78,6 +85,7 @@ class LocalChatGPT:
         message_tokens.append(model.token_eos())
         return message_tokens
 
+    @profile(stream=fp)
     def get_system_tokens(self, model: Llama) -> list:
         """
 
@@ -88,6 +96,7 @@ class LocalChatGPT:
         return self.get_message_tokens(model, **system_message)
 
     @staticmethod
+    @profile(stream=fp)
     def upload_files(files: List[tempfile.TemporaryFile]) -> List[str]:
         """
 
@@ -97,6 +106,7 @@ class LocalChatGPT:
         return [f.name for f in files]
 
     @staticmethod
+    @profile(stream=fp)
     def process_text(text: str) -> Optional[str]:
         """
 
@@ -108,6 +118,7 @@ class LocalChatGPT:
         text = "\n".join(lines).strip()
         return None if len(text) < 10 else text
 
+    @profile(stream=fp)
     def update_text_db(
         self,
         db: Optional[Chroma],
@@ -140,6 +151,7 @@ class LocalChatGPT:
             return True, db, file_warning
         return False, db, "Фрагменты ещё не загружены!"
 
+    @profile(stream=fp)
     def build_index(
         self,
         file_paths: List[str],
@@ -186,12 +198,15 @@ class LocalChatGPT:
         return db, file_warning
 
     @staticmethod
+    @profile(stream=fp)
     def _get_default_system_prompt(mode: str) -> str:
         return QUERY_SYSTEM_PROMPT if mode == "DB" else LLM_SYSTEM_PROMPT
 
+    @profile(stream=fp)
     def _set_system_prompt(self, system_prompt_input: str) -> None:
         self.system_prompt = system_prompt_input
 
+    @profile(stream=fp)
     def _set_current_mode(self, mode: str):
         self.mode = mode
         self._set_system_prompt(self._get_default_system_prompt(mode))
@@ -203,6 +218,7 @@ class LocalChatGPT:
             return gr.update(placeholder=self.system_prompt, interactive=False)
 
     @staticmethod
+    @profile(stream=fp)
     def user(message, history):
         if history is None:
             history = []
@@ -210,6 +226,7 @@ class LocalChatGPT:
         return "", new_history
 
     @staticmethod
+    @profile(stream=fp)
     def regenerate_response(history):
         """
 
@@ -219,6 +236,7 @@ class LocalChatGPT:
         return "", history
 
     @staticmethod
+    @profile(stream=fp)
     def retrieve(history, db: Optional[Chroma], collection_radio, k_documents: int) -> Union[list, str]:
         """
 
@@ -305,6 +323,7 @@ class LocalChatGPT:
             history[-1][1] = partial_text
         yield history
 
+    @profile(stream=fp)
     def ingest_files(self):
         db = self.load_db()
         files = {
@@ -313,6 +332,7 @@ class LocalChatGPT:
         }
         return pd.DataFrame({"Название файлов": list(files)})
 
+    @profile(stream=fp)
     def delete_doc(self, documents: str) -> Tuple[str, pd.DataFrame]:
         db: Chroma = self.load_db()
         all_documents: dict = db.get()
@@ -326,6 +346,7 @@ class LocalChatGPT:
             db.delete(for_delete_ids)
         return "", self.ingest_files()
 
+    @profile(stream=fp)
     def load_db(self) -> Union[Chroma, chromadb.HttpClient]:
         """
 
@@ -338,6 +359,7 @@ class LocalChatGPT:
             embedding_function=self.embeddings,
         )
 
+    @profile(stream=fp)
     def login(self, username: str, password: str) -> bool:
         """
 
@@ -354,6 +376,7 @@ class LocalChatGPT:
             self.collection = user_from_db[0]["collection"]
         return bool(user_from_db)
 
+    @profile(stream=fp)
     def run(self):
         """
 

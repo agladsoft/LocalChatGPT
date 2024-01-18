@@ -21,4 +21,4 @@ WORKDIR /app
 # Вместо этого, они будут подключены через volumes в docker-compose.yml
 
 # Запустите скрипт при запуске контейнера
-CMD ["python3", "-u", "app.py"]
+CMD ["mprof", "run", "app.py"]
