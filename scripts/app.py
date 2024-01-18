@@ -204,6 +204,8 @@ class LocalChatGPT:
 
     @staticmethod
     def user(message, history):
+        if history is None:
+            history = []
         new_history = history + [[message, None]]
         return "", new_history
 
@@ -226,7 +228,7 @@ class LocalChatGPT:
         :param k_documents:
         :return:
         """
-        if not db or collection_radio != MODES[0]:
+        if not db or collection_radio != MODES[0] or not history or not history[-1][0]:
             return "Появятся после задавания вопросов"
         last_user_message = history[-1][0]
         docs = db.similarity_search_with_score(last_user_message, k_documents)
@@ -254,7 +256,8 @@ class LocalChatGPT:
         :param model_selector:
         :return:
         """
-        if not history:
+        if not history or not history[-1][0]:
+            yield history[:-1]
             return
         model = next((model for model in self.llama_models if model_selector in model.model_path), None)
         tokens = self.get_system_tokens(model)[:]
@@ -351,7 +354,7 @@ class LocalChatGPT:
             demo.load(self.load_db, inputs=None, outputs=[db])
             favicon = f'<img src="{FAVICON_PATH}" width="48px" style="display: inline">'
             gr.Markdown(
-                f"""<h1><center>{favicon} Я, Макар - текстовый ассистент на основе GPT</center></h1>"""
+                f"""<h1><center>{favicon} Я, Макар - виртуальный ассистент Рускон</center></h1>"""
             )
 
             with gr.Tab("Чат"):
@@ -469,6 +472,12 @@ class LocalChatGPT:
                         )
                     with gr.Column(scale=3, min_width=100):
                         submit = gr.Button("📤 Отправить", variant="primary")
+
+                with gr.Row():
+                    gr.Markdown(
+                        "<center>Ассистент может допускать ошибки, поэтому рекомендуем проверять важную информацию. "
+                        "Ответы не являются призывом к действию</center>"
+                    )
 
                 with gr.Row(elem_id="buttons"):
                     gr.Button(value="👍 Понравилось")
