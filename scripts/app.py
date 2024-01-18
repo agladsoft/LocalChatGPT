@@ -42,7 +42,7 @@ class LocalChatGPT:
                     http_get(model_url, f)
 
             llama_models.append(Llama(
-                n_gpu_layers=35,
+                n_gpu_layers=30,
                 model_path=final_model_path,
                 n_ctx=CONTEXT_SIZE,
                 n_parts=1,
@@ -269,9 +269,9 @@ class LocalChatGPT:
 
         last_user_message = history[-1][0]
         pattern = r'<a\s+[^>]*>(.*?)</a>'
-        match = re.search(pattern, retrieved_docs)
-        result_text = match[1] if match else ""
-        retrieved_docs = re.sub(pattern, result_text, retrieved_docs)
+        files = re.findall(pattern, retrieved_docs)
+        for file in files:
+            retrieved_docs = re.sub(fr'<a\s+[^>]*>{file}</a>', file, retrieved_docs)
         if retrieved_docs and collection_radio == MODES[0]:
             last_user_message = f"Контекст: {retrieved_docs}\n\nИспользуя только контекст, ответь на вопрос: " \
                                     f"{last_user_message}"
@@ -294,6 +294,16 @@ class LocalChatGPT:
             partial_text += model.detokenize([token]).decode("utf-8", "ignore")
             history[-1][1] = partial_text
             yield history
+
+        if files:
+            partial_text += SOURCES_SEPARATOR
+            sources_text = "\n\n\n".join(
+                f"{index}. {source}"
+                for index, source in enumerate(files, start=1)
+            )
+            partial_text += sources_text
+            history[-1][1] = partial_text
+        yield history
 
     def ingest_files(self):
         db = self.load_db()
@@ -349,7 +359,7 @@ class LocalChatGPT:
 
         :return:
         """
-        with gr.Blocks(title="RusconGPT", theme=gr.themes.Soft(text_size=sizes.text_md), css=BLOCK_CSS) as demo:
+        with gr.Blocks(title="MakarGPT", theme=gr.themes.Soft(text_size=sizes.text_md), css=BLOCK_CSS) as demo:
             db: gr.State = gr.State(None)
             demo.load(self.load_db, inputs=None, outputs=[db])
             favicon = f'<img src="{FAVICON_PATH}" width="48px" style="display: inline">'
@@ -473,18 +483,18 @@ class LocalChatGPT:
                     with gr.Column(scale=3, min_width=100):
                         submit = gr.Button("📤 Отправить", variant="primary")
 
-                with gr.Row():
-                    gr.Markdown(
-                        "<center>Ассистент может допускать ошибки, поэтому рекомендуем проверять важную информацию. "
-                        "Ответы не являются призывом к действию</center>"
-                    )
-
                 with gr.Row(elem_id="buttons"):
                     gr.Button(value="👍 Понравилось")
                     gr.Button(value="👎 Не понравилось")
                     stop = gr.Button(value="⛔ Остановить")
                     regenerate = gr.Button(value="🔄 Повторить")
                     clear = gr.Button(value="🗑️ Очистить")
+
+                with gr.Row():
+                    gr.Markdown(
+                        "<center>Ассистент может допускать ошибки, поэтому рекомендуем проверять важную информацию. "
+                        "Ответы также не являются призывом к действию</center>"
+                    )
 
             with gr.Tab("Документы"):
                 with gr.Row():

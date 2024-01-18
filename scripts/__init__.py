@@ -51,8 +51,10 @@ LOADER_MAPPING: dict = {
 
 
 DICT_REPO_AND_MODELS: dict = {
-    "https://huggingface.co/IlyaGusev/saiga2_7b_gguf/resolve/main/model-q3_K.gguf":
-        "saiga2_7b_gguf/model-q3_K.gguf",
+    # "https://huggingface.co/IlyaGusev/saiga_mistral_7b_gguf/resolve/main/model-q4_K.gguf":
+    #     "saiga_mistral_7b_gguf/model-q4_K.gguf",
+    "https://huggingface.co/IlyaGusev/saiga2_7b_gguf/resolve/main/model-q5_K.gguf":
+        "saiga2_7b_gguf/model-q5_K.gguf",
     # "https://huggingface.co/IlyaGusev/saiga2_7b_gguf/resolve/main/model-q4_K.gguf":
     #     "saiga2_7b_gguf/model-q4_K.gguf",
     # "https://huggingface.co/IlyaGusev/saiga2_13b_gguf/resolve/main/model-q4_K.gguf":
@@ -70,6 +72,7 @@ MODELS_DIR = os.path.join(ABS_PATH, "../models")
 AUTH_FILE = os.path.join(ABS_PATH, "auth.csv")
 AVATAR_USER = os.path.join(ABS_PATH, "icons8-человек-96.png")
 AVATAR_BOT = os.path.join(ABS_PATH, "icons8-bot-96.png")
+SOURCES_SEPARATOR = "\n\n Документы: \n"
 
 FILES_DIR = os.path.join(ABS_PATH, "../upload_files")
 os.makedirs(FILES_DIR, exist_ok=True)
