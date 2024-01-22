@@ -616,7 +616,7 @@ class LocalChatGPT:
             clear.click(lambda: None, None, chatbot, queue=False)
 
         demo.queue(max_size=128, api_open=False)
-        demo.launch(server_name="0.0.0.0", max_threads=200)
+        demo.launch(server_name="0.0.0.0")
 
 
 if __name__ == "__main__":
