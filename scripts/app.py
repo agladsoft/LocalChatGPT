@@ -106,7 +106,7 @@ class LocalChatGPT:
         lines: list = text.split("\n")
         lines = [line for line in lines if len(line.strip()) > 2]
         text = "\n".join(lines).strip()
-        return None if len(text) < 10 else text
+        return "" if len(text) < 10 else text
 
     def update_text_db(
         self,
@@ -606,7 +606,7 @@ class LocalChatGPT:
             # Clear history
             clear.click(lambda: None, None, chatbot, queue=False)
 
-        demo.queue(max_size=128, api_open=False)
+        demo.queue(max_size=2, api_open=False)
         demo.launch(server_name="0.0.0.0", max_threads=200)
 
 
