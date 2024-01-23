@@ -1,10 +1,8 @@
 import re
 import csv
-import time
 import os.path
 import chromadb
 import tempfile
-import threading
 import pandas as pd
 import gradio as gr
 from re import Pattern
@@ -21,7 +19,6 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 class LocalChatGPT:
     def __init__(self):
-        self.semaphore = threading.Semaphore()
         self.llama_model: Optional[Llama] = None
         self.llama_models, self.embeddings = self.initialize_app()
         self.collection: str = "all-documents"
@@ -205,14 +202,11 @@ class LocalChatGPT:
         else:
             return gr.update(placeholder=self.system_prompt, interactive=False)
 
-    def user(self, message, history):
-        print("Обработка вопроса")
-        self.semaphore.acquire()
+    @staticmethod
+    def user(message, history):
         if history is None:
             history = []
         new_history = history + [[message, None]]
-        self.semaphore.release()
-        print("Закончена обработка вопроса")
         return "", new_history
 
     @staticmethod
@@ -262,8 +256,6 @@ class LocalChatGPT:
         :param model_selector:
         :return:
         """
-        print("Получили контекст. Начинается подготовка к генерации ответа")
-        self.semaphore.acquire()
         if not history or not history[-1][0]:
             yield history[:-1]
             return
@@ -312,7 +304,6 @@ class LocalChatGPT:
             partial_text += sources_text
             history[-1][1] = partial_text
         yield history
-        self.semaphore.release()
 
     def ingest_files(self):
         db = self.load_db()
