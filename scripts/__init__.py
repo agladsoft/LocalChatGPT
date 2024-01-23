@@ -1,4 +1,5 @@
 import os
+import logging
 from langchain.document_loaders import (
     CSVLoader,
     EverNoteLoader,
@@ -69,6 +70,7 @@ MAX_NEW_TOKENS: int = 1500
 ABS_PATH = os.path.dirname(os.path.abspath(__file__))
 DB_DIR = os.path.join(ABS_PATH, "../chroma")
 MODELS_DIR = os.path.join(ABS_PATH, "../models")
+LOGGING_DIR: str = os.path.join(ABS_PATH, "../logging")
 AUTH_FILE = os.path.join(ABS_PATH, "auth.csv")
 AVATAR_USER = os.path.join(ABS_PATH, "icons8-человек-96.png")
 AVATAR_BOT = os.path.join(ABS_PATH, "icons8-bot-96.png")
@@ -96,3 +98,31 @@ tr span {
 }
 
 """
+
+LOG_FORMAT: str = "[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s"
+DATE_FTM: str = "%d/%B/%Y %H:%M:%S"
+
+
+def get_file_handler(name: str) -> logging.FileHandler:
+    if not os.path.exists(LOGGING_DIR):
+        os.mkdir(LOGGING_DIR)
+    file_handler: logging.FileHandler = logging.FileHandler(f"{LOGGING_DIR}/{name}.log")
+    file_handler.setFormatter(logging.Formatter(LOG_FORMAT, datefmt=DATE_FTM))
+    return file_handler
+
+
+def get_stream_handler():
+    stream_handler: logging.StreamHandler = logging.StreamHandler()
+    stream_handler.setLevel(logging.INFO)
+    stream_handler.setFormatter(logging.Formatter(LOG_FORMAT))
+    return stream_handler
+
+
+def get_logger(name: str) -> logging.getLogger:
+    logger: logging.getLogger = logging.getLogger(name)
+    if logger.hasHandlers():
+        logger.handlers.clear()
+    logger.addHandler(get_file_handler(name))
+    logger.addHandler(get_stream_handler())
+    logger.setLevel(logging.INFO)
+    return logger

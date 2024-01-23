@@ -8,6 +8,7 @@ import gradio as gr
 from re import Pattern
 from __init__ import *
 from llama_cpp import Llama
+from datetime import datetime
 from gradio.themes.utils import sizes
 from langchain.vectorstores import Chroma
 from typing import List, Optional, Union, Tuple
@@ -15,6 +16,10 @@ from langchain.docstore.document import Document
 from huggingface_hub.file_download import http_get
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+
+
+logger: logging.getLogger = get_logger(os.path.basename(__file__).replace(".py", "_")
+                                       + str(datetime.now().date()))
 
 
 class LocalChatGPT:
@@ -204,6 +209,7 @@ class LocalChatGPT:
 
     @staticmethod
     def user(message, history):
+        logger.info("Обработка вопроса")
         if history is None:
             history = []
         new_history = history + [[message, None]]
@@ -242,6 +248,7 @@ class LocalChatGPT:
             else:
                 data[document] = f"Score: {round(doc[1], 2)}, Text: {doc[0].page_content}"
         list_data: list = [f"{doc}\n\n{text}" for doc, text in data.items()]
+        logger.info("Получили контекст из базы")
         return "\n\n\n".join(list_data) if list_data else "Документов в базе нету"
 
     def bot(self, history, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector):
@@ -286,7 +293,7 @@ class LocalChatGPT:
             top_p=top_p,
             temp=temp
         )
-
+        logger.info("Осуществляется генерации ответа")
         partial_text = ""
         for i, token in enumerate(generator):
             if token == model.token_eos() or (MAX_NEW_TOKENS is not None and i >= MAX_NEW_TOKENS):
