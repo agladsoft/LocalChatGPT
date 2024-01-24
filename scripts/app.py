@@ -48,12 +48,15 @@ class LocalChatGPT:
 
             llama_models.append(Llama(
                 n_gpu_layers=5,
-                n_threads=900,
-                n_threads_batch=500,
+                # n_threads=4,
+                # n_threads_batch=4,
                 model_path=final_model_path,
                 n_ctx=CONTEXT_SIZE,
                 n_parts=1,
             ))
+            logger.info(f"n_threads - {llama_models[0].n_threads}")
+            logger.info(f"n_threads_batch - {llama_models[0].n_threads_batch}")
+
 
         return llama_models, HuggingFaceEmbeddings(model_name=EMBEDDER_NAME, cache_folder=MODELS_DIR)
 
