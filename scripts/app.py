@@ -34,7 +34,7 @@ class LocalChatGPT:
     @staticmethod
     def load_model(final_model_path):
         return Llama(
-            n_gpu_layers=5,
+            n_gpu_layers=30,
             model_path=final_model_path,
             n_ctx=CONTEXT_SIZE,
             n_parts=1,
