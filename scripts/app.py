@@ -48,8 +48,8 @@ class LocalChatGPT:
 
             llama_models.append(Llama(
                 n_gpu_layers=5,
-                n_threads=200,
-                n_threads_batch=100,
+                n_threads=1000,
+                # n_threads_batch=100,
                 model_path=final_model_path,
                 n_ctx=CONTEXT_SIZE,
                 n_parts=1,
