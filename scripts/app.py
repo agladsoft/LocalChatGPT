@@ -553,7 +553,6 @@ class LocalChatGPT:
                 inputs=[msg, chatbot],
                 outputs=[msg, chatbot],
                 queue=False,
-                concurrency_limit=2
             ).success(
                 fn=self.retrieve,
                 inputs=[chatbot, db, collection_radio, k_documents],
@@ -572,7 +571,6 @@ class LocalChatGPT:
                 inputs=[msg, chatbot],
                 outputs=[msg, chatbot],
                 queue=False,
-                concurrency_limit=2
             ).success(
                 fn=self.retrieve,
                 inputs=[chatbot, db, collection_radio, k_documents],
@@ -591,7 +589,6 @@ class LocalChatGPT:
                 inputs=chatbot,
                 outputs=[msg, chatbot],
                 queue=False,
-                concurrency_limit=2
             ).success(
                 fn=self.retrieve,
                 inputs=[chatbot, db, collection_radio, k_documents],
@@ -617,7 +614,7 @@ class LocalChatGPT:
             clear.click(lambda: None, None, chatbot, queue=False)
 
         demo.queue(max_size=128, api_open=False, default_concurrency_limit=2)
-        demo.launch(server_name="0.0.0.0")
+        demo.launch(server_name="0.0.0.0", max_threads=200)
 
 
 if __name__ == "__main__":
