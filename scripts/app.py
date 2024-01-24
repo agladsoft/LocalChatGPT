@@ -553,6 +553,7 @@ class LocalChatGPT:
                 inputs=[msg, chatbot],
                 outputs=[msg, chatbot],
                 queue=False,
+                concurrency_limit=2
             ).success(
                 fn=self.retrieve,
                 inputs=[chatbot, db, collection_radio, k_documents],
@@ -571,6 +572,7 @@ class LocalChatGPT:
                 inputs=[msg, chatbot],
                 outputs=[msg, chatbot],
                 queue=False,
+                concurrency_limit=2
             ).success(
                 fn=self.retrieve,
                 inputs=[chatbot, db, collection_radio, k_documents],
@@ -589,6 +591,7 @@ class LocalChatGPT:
                 inputs=chatbot,
                 outputs=[msg, chatbot],
                 queue=False,
+                concurrency_limit=2
             ).success(
                 fn=self.retrieve,
                 inputs=[chatbot, db, collection_radio, k_documents],
