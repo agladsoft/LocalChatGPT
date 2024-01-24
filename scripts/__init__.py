@@ -23,7 +23,7 @@ QUERY_SYSTEM_PROMPT: str = "Вы, Макар - полезный, уважите�
 LLM_SYSTEM_PROMPT: str = "Вы, Макар - полезный, уважительный и честный ассистент."
 
 MODES: list = ["DB", "LLM"]
-CONTEXT_SIZE = 4000
+CONTEXT_SIZE = 2000
 SYSTEM_TOKEN: int = 1788
 USER_TOKEN: int = 1404
 BOT_TOKEN: int = 9225
