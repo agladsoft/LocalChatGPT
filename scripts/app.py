@@ -606,6 +606,7 @@ class LocalChatGPT:
                 inputs=None,
                 outputs=None,
                 cancels=[submit_event, submit_click_event, regenerate_click_event],
+                queue=False
             )
 
             # Clear history
