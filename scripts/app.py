@@ -551,6 +551,7 @@ class LocalChatGPT:
             submit_event = msg.submit(
                 fn=self.user,
                 inputs=[msg, chatbot],
+                outputs=[msg, chatbot],
                 queue=False
             ).success(
                 fn=self.retrieve,
