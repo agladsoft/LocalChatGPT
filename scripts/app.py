@@ -607,7 +607,7 @@ class LocalChatGPT:
             # Clear history
             clear.click(lambda: None, None, chatbot, queue=False)
 
-        demo.queue(max_size=128, api_open=False, concurrency_count=2)
+        demo.queue(max_size=128, api_open=False, default_concurrency_limit=2)
         demo.launch(server_name="0.0.0.0", max_threads=200)
 
 
