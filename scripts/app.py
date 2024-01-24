@@ -556,12 +556,12 @@ class LocalChatGPT:
                 fn=self.retrieve,
                 inputs=[chatbot, db, collection_radio, k_documents],
                 outputs=[retrieved_docs],
-                queue=True
+                queue=False
             ).success(
                 fn=self.bot,
                 inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector],
                 outputs=chatbot,
-                queue=True
+                queue=False
             )
 
             # Pressing the button
@@ -569,17 +569,15 @@ class LocalChatGPT:
                 fn=self.user,
                 inputs=[msg, chatbot],
                 outputs=[msg, chatbot],
-                queue=False
+                concurrency_limit=2
             ).success(
                 fn=self.retrieve,
                 inputs=[chatbot, db, collection_radio, k_documents],
                 outputs=[retrieved_docs],
-                queue=True
             ).success(
                 fn=self.bot,
                 inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector],
                 outputs=chatbot,
-                queue=True
             )
 
             # Regenerate
@@ -592,12 +590,10 @@ class LocalChatGPT:
                 fn=self.retrieve,
                 inputs=[chatbot, db, collection_radio, k_documents],
                 outputs=[retrieved_docs],
-                queue=True
             ).success(
                 fn=self.bot,
                 inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector],
                 outputs=chatbot,
-                queue=True
             )
 
             # Stop generation
