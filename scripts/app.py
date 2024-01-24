@@ -569,6 +569,7 @@ class LocalChatGPT:
                 fn=self.user,
                 inputs=[msg, chatbot],
                 outputs=[msg, chatbot],
+                queue=False,
                 concurrency_limit=2
             ).success(
                 fn=self.retrieve,
