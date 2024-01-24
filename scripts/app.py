@@ -24,38 +24,36 @@ logger: logging.getLogger = get_logger(os.path.basename(__file__).replace(".py",
 
 class LocalChatGPT:
     def __init__(self):
-        self.llama_model: Optional[Llama] = None
-        self.llama_models, self.embeddings = self.initialize_app()
+        # self.llama_model: Optional[Llama] = None
+        self.llama_model, self.embeddings = self.initialize_app()
         self.collection: str = "all-documents"
         self.mode: str = MODES[0]
         self.system_prompt = self._get_default_system_prompt(self.mode)
-
+        self.list_models = []
+        
     @staticmethod
-    def initialize_app() -> Tuple[List[Llama], HuggingFaceEmbeddings]:
+    def load_model(final_model_path):
+        return Llama(
+            n_gpu_layers=5,
+            model_path=final_model_path,
+            n_ctx=CONTEXT_SIZE,
+            n_parts=1,
+        )
+
+    def initialize_app(self) -> Tuple[Llama, HuggingFaceEmbeddings]:
         """
         Загружаем все модели из списка.
         :return:
         """
-        llama_models: list = []
         os.makedirs(MODELS_DIR, exist_ok=True)
-        for model_url, model_name in list(DICT_REPO_AND_MODELS.items()):
-            final_model_path = os.path.join(MODELS_DIR, model_name)
-            os.makedirs(os.path.dirname(final_model_path), exist_ok=True)
+        final_model_path = os.path.join(MODELS_DIR, MODEL_NAME)
+        os.makedirs(os.path.dirname(final_model_path), exist_ok=True)
 
-            if not os.path.exists(final_model_path):
-                with open(final_model_path, "wb") as f:
-                    http_get(model_url, f)
+        if not os.path.exists(final_model_path):
+            with open(final_model_path, "wb") as f:
+                http_get(MODEL_URL, f)
 
-            llama_models.append(Llama(
-                n_gpu_layers=5,
-                model_path=final_model_path,
-                n_ctx=CONTEXT_SIZE,
-                n_parts=1,
-            ))
-            logger.info(f"n_threads - {llama_models[0].n_threads}")
-            logger.info(f"n_threads_batch - {llama_models[0].n_threads_batch}")
-
-        return llama_models, HuggingFaceEmbeddings(model_name=EMBEDDER_NAME, cache_folder=MODELS_DIR)
+        return self.load_model(final_model_path), HuggingFaceEmbeddings(model_name=EMBEDDER_NAME, cache_folder=MODELS_DIR)
 
     @staticmethod
     def load_single_document(file_path: str) -> Document:
@@ -253,47 +251,13 @@ class LocalChatGPT:
         logger.info("Получили контекст из базы")
         return "\n\n\n".join(list_data) if list_data else "Документов в базе нету"
 
-    def bot(self, history, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector):
-        """
-
-        :param history:
-        :param collection_radio:
-        :param retrieved_docs:
-        :param top_p:
-        :param top_k:
-        :param temp:
-        :param model_selector:
-        :return:
-        """
-        if not history or not history[-1][0]:
-            yield history[:-1]
-            return
-        model = next((model for model in self.llama_models if model_selector in model.model_path), None)
-        tokens = self.get_system_tokens(model)[:]
-        tokens.append(LINEBREAK_TOKEN)
-
-        for user_message, bot_message in history[-4:-1]:
-            message_tokens = self.get_message_tokens(model=model, role="user", content=user_message)
-            tokens.extend(message_tokens)
-
-        last_user_message = history[-1][0]
-        pattern = r'<a\s+[^>]*>(.*?)</a>'
-        files = re.findall(pattern, retrieved_docs)
-        for file in files:
-            retrieved_docs = re.sub(fr'<a\s+[^>]*>{file}</a>', file, retrieved_docs)
-        if retrieved_docs and collection_radio == MODES[0]:
-            last_user_message = f"Контекст: {retrieved_docs}\n\nИспользуя только контекст, ответь на вопрос: " \
-                                    f"{last_user_message}"
-        message_tokens = self.get_message_tokens(model=model, role="user", content=last_user_message)
-        tokens.extend(message_tokens)
-
-        role_tokens = [model.token_bos(), BOT_TOKEN, LINEBREAK_TOKEN]
-        tokens.extend(role_tokens)
-        generator = model.generate(
+    def generate_answers(self, history, model, files, tokens, top_k, top_p, temp):
+        self.list_models.append(model)
+        generator = self.list_models[-1].generate(
             tokens,
-            # top_k=top_k,
-            # top_p=top_p,
-            # temp=temp
+            top_k=top_k,
+            top_p=top_p,
+            temp=temp
         )
         logger.info("Осуществляется генерации ответа")
         partial_text = ""
@@ -313,6 +277,77 @@ class LocalChatGPT:
             partial_text += sources_text
             history[-1][1] = partial_text
         yield history
+
+    def bot(self, history, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector):
+        """
+
+        :param history:
+        :param collection_radio:
+        :param retrieved_docs:
+        :param top_p:
+        :param top_k:
+        :param temp:
+        :param model_selector:
+        :return:
+        """
+        if not history or not history[-1][0]:
+            yield history[:-1]
+            return
+        model = self.llama_model
+        tokens = self.get_system_tokens(model)[:]
+        tokens.append(LINEBREAK_TOKEN)
+
+        for user_message, bot_message in history[-4:-1]:
+            message_tokens = self.get_message_tokens(model=model, role="user", content=user_message)
+            tokens.extend(message_tokens)
+
+        last_user_message = history[-1][0]
+        pattern = r'<a\s+[^>]*>(.*?)</a>'
+        files = re.findall(pattern, retrieved_docs)
+        for file in files:
+            retrieved_docs = re.sub(fr'<a\s+[^>]*>{file}</a>', file, retrieved_docs)
+        if retrieved_docs and collection_radio == MODES[0]:
+            last_user_message = f"Контекст: {retrieved_docs}\n\nИспользуя только контекст, ответь на вопрос: " \
+                                        f"{last_user_message}"
+        message_tokens = self.get_message_tokens(model=model, role="user", content=last_user_message)
+        tokens.extend(message_tokens)
+
+        role_tokens = [model.token_bos(), BOT_TOKEN, LINEBREAK_TOKEN]
+        tokens.extend(role_tokens)
+        if not self.list_models:
+            pass
+        elif len(self.list_models) != COUNT_OBJ_MODELS:
+            model = self.load_model(final_model_path=os.path.join(MODELS_DIR, MODEL_NAME))
+        else:
+            while len(self.list_models) == COUNT_OBJ_MODELS:
+                logger.info("Все модели заняты")
+            model = self.load_model(final_model_path=os.path.join(MODELS_DIR, MODEL_NAME))
+        self.list_models.append(model)
+        generator = self.list_models[-1].generate(
+            tokens,
+            top_k=top_k,
+            top_p=top_p,
+            temp=temp
+        )
+        logger.info("Осуществляется генерации ответа")
+        partial_text = ""
+        for i, token in enumerate(generator):
+            if token == model.token_eos() or (MAX_NEW_TOKENS is not None and i >= MAX_NEW_TOKENS):
+                break
+            partial_text += model.detokenize([token]).decode("utf-8", "ignore")
+            history[-1][1] = partial_text
+            yield history
+
+        if files:
+            partial_text += SOURCES_SEPARATOR
+            sources_text = "\n\n\n".join(
+                f"{index}. {source}"
+                for index, source in enumerate(files, start=1)
+            )
+            partial_text += sources_text
+            history[-1][1] = partial_text
+        yield history
+        self.list_models.pop(-1)
 
     def ingest_files(self):
         db = self.load_db()
@@ -615,7 +650,7 @@ class LocalChatGPT:
             # Clear history
             clear.click(lambda: None, None, chatbot, queue=False)
 
-        demo.queue(max_size=128, api_open=False, default_concurrency_limit=2)
+        demo.queue(max_size=128, api_open=False, default_concurrency_limit=3)
         demo.launch(server_name="0.0.0.0", max_threads=200)
 
 

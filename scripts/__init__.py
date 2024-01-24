@@ -61,6 +61,10 @@ DICT_REPO_AND_MODELS: dict = {
     # "https://huggingface.co/IlyaGusev/saiga2_13b_gguf/resolve/main/model-q4_K.gguf":
     #     "saiga2_13b_gguf/model-q4_K.gguf"
 }
+MODEL_URL = "https://huggingface.co/IlyaGusev/saiga2_7b_gguf/resolve/main/model-q3_K.gguf"
+MODEL_NAME = "saiga2_7b_gguf/model-q3_K.gguf"
+
+COUNT_OBJ_MODELS = 2
 
 
 EMBEDDER_NAME: str = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
