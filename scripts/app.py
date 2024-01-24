@@ -50,6 +50,8 @@ class LocalChatGPT:
                 n_gpu_layers=5,
                 n_threads=1,
                 n_threads_batch=1,
+                main_gpu=2,
+                use_mlock=True,
                 model_path=final_model_path,
                 n_ctx=CONTEXT_SIZE,
                 n_parts=1,
