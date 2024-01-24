@@ -551,18 +551,14 @@ class LocalChatGPT:
             submit_event = msg.submit(
                 fn=self.user,
                 inputs=[msg, chatbot],
-                outputs=[msg, chatbot],
-                queue=False,
             ).success(
                 fn=self.retrieve,
                 inputs=[chatbot, db, collection_radio, k_documents],
                 outputs=[retrieved_docs],
-                queue=True,
             ).success(
                 fn=self.bot,
                 inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector],
                 outputs=chatbot,
-                queue=True
             )
 
             # Pressing the button
@@ -570,17 +566,14 @@ class LocalChatGPT:
                 fn=self.user,
                 inputs=[msg, chatbot],
                 outputs=[msg, chatbot],
-                queue=False,
             ).success(
                 fn=self.retrieve,
                 inputs=[chatbot, db, collection_radio, k_documents],
                 outputs=[retrieved_docs],
-                queue=True,
             ).success(
                 fn=self.bot,
                 inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector],
                 outputs=chatbot,
-                queue=True
             )
 
             # Regenerate
@@ -588,17 +581,14 @@ class LocalChatGPT:
                 fn=self.regenerate_response,
                 inputs=chatbot,
                 outputs=[msg, chatbot],
-                queue=False,
             ).success(
                 fn=self.retrieve,
                 inputs=[chatbot, db, collection_radio, k_documents],
                 outputs=[retrieved_docs],
-                queue=True,
             ).success(
                 fn=self.bot,
                 inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector],
                 outputs=chatbot,
-                queue=True
             )
 
             # Stop generation
@@ -607,13 +597,12 @@ class LocalChatGPT:
                 inputs=None,
                 outputs=None,
                 cancels=[submit_event, submit_click_event, regenerate_click_event],
-                queue=False,
             )
 
             # Clear history
             clear.click(lambda: None, None, chatbot, queue=False)
 
-        demo.queue(max_size=128, api_open=False, default_concurrency_limit=2)
+        demo.queue(max_size=128, api_open=False, default_concurrency_limit=1)
         demo.launch(server_name="0.0.0.0", max_threads=200)
 
 
