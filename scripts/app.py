@@ -551,7 +551,8 @@ class LocalChatGPT:
             submit_event = msg.submit(
                 fn=self.user,
                 inputs=[msg, chatbot],
-                concurrency_limit=2
+                concurrency_limit=2,
+                queue=False
             ).success(
                 fn=self.retrieve,
                 inputs=[chatbot, db, collection_radio, k_documents],
@@ -567,7 +568,8 @@ class LocalChatGPT:
                 fn=self.user,
                 inputs=[msg, chatbot],
                 outputs=[msg, chatbot],
-                concurrency_limit=2
+                concurrency_limit=2,
+                queue=False
             ).success(
                 fn=self.retrieve,
                 inputs=[chatbot, db, collection_radio, k_documents],
