@@ -38,6 +38,9 @@ class LocalChatGPT:
             model_path=final_model_path,
             n_ctx=CONTEXT_SIZE,
             n_parts=1,
+            n_threads=2,
+            n_threads_batch=2,
+            use_mlock=True
         )
 
     def initialize_app(self) -> Tuple[Llama, HuggingFaceEmbeddings]:
