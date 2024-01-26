@@ -45,6 +45,13 @@ ubuntu-drivers devices # install recommended drivers
 
 sudo apt install nvidia-driver-xxx # or sudo ubuntu-drivers autoinstall
 
+sudo nano /etc/security/limits.conf # insert this text ↓
+
+# *   soft    nproc   65000
+# *   hard    nproc   1000000
+# *   -    nofile  1048576
+# * - memlock unlimited
+
 sudo reboot
 
 wget https://nvidia.github.io/nvidia-docker/gpgkey --no-check-certificate
