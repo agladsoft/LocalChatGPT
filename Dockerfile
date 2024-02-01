@@ -20,5 +20,8 @@ WORKDIR /app
 # Не копируйте большие модели в образ, так как это может сделать его слишком объемным
 # Вместо этого, они будут подключены через volumes в docker-compose.yml
 
+RUN pip install --no-cache-dir redis flower
+
+ENV PYTHONHASHSEED=random PYTHONDONTWRITEBYTECODE=1
 # Запустите скрипт при запуске контейнера
-CMD ["python3", "-u", "app.py"]
+#CMD ["python3", "-u", "app.py"]

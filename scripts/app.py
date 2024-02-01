@@ -1,5 +1,6 @@
 import re
 import csv
+import uvicorn
 import os.path
 import chromadb
 import tempfile
@@ -7,6 +8,8 @@ import pandas as pd
 import gradio as gr
 from re import Pattern
 from __init__ import *
+from celery import Celery
+from fastapi import FastAPI
 from llama_cpp import Llama
 from datetime import datetime
 from gradio.themes.utils import sizes
@@ -17,43 +20,53 @@ from huggingface_hub.file_download import http_get
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
+# app = FastAPI()
+# logger: logging.getLogger = get_logger(os.path.basename(__file__).replace(".py", "_")
+#                                        + str(datetime.now().date()))
+app = Celery(
+    "tasks",
+    broker=os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0'),
+    backend=os.environ.get('CELERY_RESULT_BACKEND', 'redis://localhost:6379/1')
+)
+app.conf.accept_content = ['pickle', 'json', 'msgpack', 'yaml']
+app.conf.worker_send_task_events = True
 
-logger: logging.getLogger = get_logger(os.path.basename(__file__).replace(".py", "_")
-                                       + str(datetime.now().date()))
+
+def initialize_app() -> Tuple[List[Llama], HuggingFaceEmbeddings]:
+    """
+    Загружаем все модели из списка.
+    :return:
+    """
+    llama_models: list = []
+    os.makedirs(MODELS_DIR, exist_ok=True)
+    for model_url, model_name in list(DICT_REPO_AND_MODELS.items()):
+        final_model_path = os.path.join(MODELS_DIR, model_name)
+        os.makedirs(os.path.dirname(final_model_path), exist_ok=True)
+
+        if not os.path.exists(final_model_path):
+            with open(final_model_path, "wb") as f:
+                http_get(model_url, f)
+
+        llama_models.append(Llama(
+            # n_gpu_layers=35,
+            model_path=final_model_path,
+            n_ctx=CONTEXT_SIZE,
+            n_parts=1,
+        ))
+
+    return llama_models, HuggingFaceEmbeddings(model_name=EMBEDDER_NAME, cache_folder=MODELS_DIR)
 
 
 class LocalChatGPT:
+    llama_models, embeddings = initialize_app()
+
     def __init__(self):
+        self.db: Optional[Chroma] = None
         self.llama_model: Optional[Llama] = None
-        self.llama_models, self.embeddings = self.initialize_app()
+        # self.llama_models, self.embeddings = initialize_app()
         self.collection: str = "all-documents"
         self.mode: str = MODES[0]
         self.system_prompt = self._get_default_system_prompt(self.mode)
-
-    @staticmethod
-    def initialize_app() -> Tuple[List[Llama], HuggingFaceEmbeddings]:
-        """
-        Загружаем все модели из списка.
-        :return:
-        """
-        llama_models: list = []
-        os.makedirs(MODELS_DIR, exist_ok=True)
-        for model_url, model_name in list(DICT_REPO_AND_MODELS.items()):
-            final_model_path = os.path.join(MODELS_DIR, model_name)
-            os.makedirs(os.path.dirname(final_model_path), exist_ok=True)
-
-            if not os.path.exists(final_model_path):
-                with open(final_model_path, "wb") as f:
-                    http_get(model_url, f)
-
-            llama_models.append(Llama(
-                n_gpu_layers=35,
-                model_path=final_model_path,
-                n_ctx=CONTEXT_SIZE,
-                n_parts=1,
-            ))
-
-        return llama_models, HuggingFaceEmbeddings(model_name=EMBEDDER_NAME, cache_folder=MODELS_DIR)
 
     @staticmethod
     def load_single_document(file_path: str) -> Document:
@@ -115,7 +128,6 @@ class LocalChatGPT:
 
     def update_text_db(
         self,
-        db: Optional[Chroma],
         fixed_documents: List[Document],
         ids: List[str]
     ) -> Union[Optional[Chroma], str]:
@@ -126,15 +138,15 @@ class LocalChatGPT:
         :param ids:
         :return:
         """
-        data: dict = db.get()
+        data: dict = self.db.get()
         files_db = {os.path.basename(dict_data['source']) for dict_data in data["metadatas"]}
         files_load = {os.path.basename(dict_data.metadata["source"]) for dict_data in fixed_documents}
         if same_files := files_load & files_db:
             gr.Warning("Файлы " + ", ".join(same_files) + " повторяются, поэтому они будут обновлены")
             for file in same_files:
                 pattern: Pattern[str] = re.compile(fr'{file.replace(".txt", "")}\d*$')
-                db.delete([x for x in data['ids'] if pattern.match(x)])
-            db = db.from_documents(
+                self.db.delete([x for x in data['ids'] if pattern.match(x)])
+            db = self.db.from_documents(
                 documents=fixed_documents,
                 embedding=self.embeddings,
                 ids=ids,
@@ -143,12 +155,11 @@ class LocalChatGPT:
             )
             file_warning = f"Загружено {len(fixed_documents)} фрагментов! Можно задавать вопросы."
             return True, db, file_warning
-        return False, db, "Фрагменты ещё не загружены!"
+        return False, "Фрагменты ещё не загружены!"
 
     def build_index(
         self,
         file_paths: List[str],
-        db: Optional[Chroma],
         chunk_size: int,
         chunk_overlap: int
     ):
@@ -176,10 +187,10 @@ class LocalChatGPT:
             f"{os.path.basename(doc.metadata['source']).replace('.txt', '')}{i}"
             for i, doc in enumerate(fixed_documents)
         ]
-        is_updated, db, file_warning = self.update_text_db(db, fixed_documents, ids)
+        is_updated, file_warning = self.update_text_db(fixed_documents, ids)
         if is_updated:
-            return db, file_warning
-        db = db.from_documents(
+            return file_warning
+        self.db = self.db.from_documents(
             documents=fixed_documents,
             embedding=self.embeddings,
             ids=ids,
@@ -187,8 +198,8 @@ class LocalChatGPT:
             collection_name=self.collection,
         )
         file_warning = f"Загружено {len(fixed_documents)} фрагментов! Можно задавать вопросы."
-        os.chmod(FILES_DIR, 0o0777)
-        return db, file_warning
+        # os.chmod(FILES_DIR, 0o0777)
+        return file_warning
 
     @staticmethod
     def _get_default_system_prompt(mode: str) -> str:
@@ -208,8 +219,15 @@ class LocalChatGPT:
             return gr.update(placeholder=self.system_prompt, interactive=False)
 
     @staticmethod
+    def generate_answer(msg, chatbot, k_documents, collection_radio, top_p, top_k, temp, model_selector):
+        print("start generate_answer")
+        msg = receive_answer.apply_async(args=[msg, chatbot, k_documents, collection_radio, top_p, top_k, temp, model_selector])
+        print(msg)
+        print("end generate_answer")
+        return "", chatbot
+
+    @staticmethod
     def user(message, history):
-        logger.info("Обработка вопроса")
         if history is None:
             history = []
         new_history = history + [[message, None]]
@@ -224,20 +242,19 @@ class LocalChatGPT:
         """
         return "", history
 
-    @staticmethod
-    def retrieve(history, db: Optional[Chroma], collection_radio, k_documents: int) -> Union[list, str]:
+    def retrieve(self, history, collection_radio, k_documents: int) -> Union[list, str]:
         """
 
         :param history:
-        :param db:
         :param collection_radio:
         :param k_documents:
         :return:
         """
-        if not db or collection_radio != MODES[0] or not history or not history[-1][0]:
+        print(self.db)
+        if not self.db or collection_radio != MODES[0] or not history or not history[-1][0]:
             return "Появятся после задавания вопросов"
         last_user_message = history[-1][0]
-        docs = db.similarity_search_with_score(last_user_message, k_documents)
+        docs = self.db.similarity_search_with_score(last_user_message, k_documents)
         data: dict = {}
         for doc in docs:
             url = f"""<a href="file/{doc[0].metadata["source"]}" target="_blank" 
@@ -248,10 +265,10 @@ class LocalChatGPT:
             else:
                 data[document] = f"Score: {round(doc[1], 2)}, Text: {doc[0].page_content}"
         list_data: list = [f"{doc}\n\n{text}" for doc, text in data.items()]
-        logger.info("Получили контекст из базы")
+        # logger.info("Получили контекст из базы")
         return "\n\n\n".join(list_data) if list_data else "Документов в базе нету"
 
-    def bot(self, history, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector):
+    def bot(self, message, history, k_documents, collection_radio, top_p, top_k, temp, model_selector):
         """
 
         :param history:
@@ -263,9 +280,10 @@ class LocalChatGPT:
         :param model_selector:
         :return:
         """
-        if not history or not history[-1][0]:
-            yield history[:-1]
-            return
+        message, history = self.user(message, history)
+        retrieved_docs = self.retrieve(history, collection_radio, k_documents)
+        # if not history or not history[-1][0]:
+        #     return
         model = next((model for model in self.llama_models if model_selector in model.model_path), None)
         tokens = self.get_system_tokens(model)[:]
         tokens.append(LINEBREAK_TOKEN)
@@ -293,14 +311,13 @@ class LocalChatGPT:
             top_p=top_p,
             temp=temp
         )
-        logger.info("Осуществляется генерации ответа")
+        # logger.info("Осуществляется генерации ответа")
         partial_text = ""
         for i, token in enumerate(generator):
             if token == model.token_eos() or (MAX_NEW_TOKENS is not None and i >= MAX_NEW_TOKENS):
                 break
             partial_text += model.detokenize([token]).decode("utf-8", "ignore")
             history[-1][1] = partial_text
-            yield history
 
         if files:
             partial_text += SOURCES_SEPARATOR
@@ -310,19 +327,20 @@ class LocalChatGPT:
             )
             partial_text += sources_text
             history[-1][1] = partial_text
-        yield history
+        print(partial_text)
+        return partial_text
 
     def ingest_files(self):
-        db = self.load_db()
+        self.load_db()
         files = {
             os.path.basename(ingested_document["source"])
-            for ingested_document in db.get()["metadatas"]
+            for ingested_document in self.db.get()["metadatas"]
         }
         return pd.DataFrame({"Название файлов": list(files)})
 
     def delete_doc(self, documents: str) -> Tuple[str, pd.DataFrame]:
-        db: Chroma = self.load_db()
-        all_documents: dict = db.get()
+        self.load_db()
+        all_documents: dict = self.db.get()
         for_delete_ids: list = []
         list_documents: List[str] = documents.strip().split("\n")
         for ingested_document, doc_id in zip(all_documents["metadatas"], all_documents["ids"]):
@@ -330,16 +348,16 @@ class LocalChatGPT:
             if os.path.basename(ingested_document["source"]) in list_documents:
                 for_delete_ids.append(doc_id)
         if for_delete_ids:
-            db.delete(for_delete_ids)
+            self.db.delete(for_delete_ids)
         return "", self.ingest_files()
 
-    def load_db(self) -> Union[Chroma, chromadb.HttpClient]:
+    def load_db(self):
         """
 
         :return:
         """
         client = chromadb.PersistentClient(path=DB_DIR)
-        return Chroma(
+        self.db = Chroma(
             client=client,
             collection_name=self.collection,
             embedding_function=self.embeddings,
@@ -367,8 +385,7 @@ class LocalChatGPT:
         :return:
         """
         with gr.Blocks(title="MakarGPT", theme=gr.themes.Soft(text_size=sizes.text_md), css=BLOCK_CSS) as demo:
-            db: gr.State = gr.State(None)
-            demo.load(self.load_db, inputs=None, outputs=[db])
+            demo.load(self.load_db, inputs=None, outputs=None)
             favicon = f'<img src="{FAVICON_PATH}" width="48px" style="display: inline">'
             gr.Markdown(
                 f"""<h1><center>{favicon} Я, Макар - виртуальный ассистент Рускон</center></h1>"""
@@ -532,8 +549,8 @@ class LocalChatGPT:
                 queue=True,
             ).success(
                 fn=self.build_index,
-                inputs=[file_paths, db, chunk_size, chunk_overlap],
-                outputs=[db, file_warning],
+                inputs=[file_paths, chunk_size, chunk_overlap],
+                outputs=[file_warning],
                 queue=True
             ).success(
                 self.ingest_files,
@@ -547,76 +564,102 @@ class LocalChatGPT:
                 outputs=[find_doc, ingested_dataset]
             )
 
-            # Pressing Enter
-            submit_event = msg.submit(
-                fn=self.user,
-                inputs=[msg, chatbot],
-                outputs=[msg, chatbot],
-                queue=False,
-            ).success(
-                fn=self.retrieve,
-                inputs=[chatbot, db, collection_radio, k_documents],
-                outputs=[retrieved_docs],
-                queue=True,
-            ).success(
-                fn=self.bot,
-                inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector],
-                outputs=chatbot,
-                queue=True
-            )
+            # # Pressing Enter
+            # submit_event = msg.submit(
+            #     fn=self.user,
+            #     inputs=[msg, chatbot],
+            #     outputs=[msg, chatbot],
+            #     queue=False,
+            # ).success(
+            #     fn=self.retrieve,
+            #     inputs=[chatbot, db, collection_radio, k_documents],
+            #     outputs=[retrieved_docs],
+            #     queue=True,
+            # ).success(
+            #     fn=self.bot,
+            #     inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector],
+            #     outputs=chatbot,
+            #     queue=True
+            # )
 
             # Pressing the button
             submit_click_event = submit.click(
-                fn=self.user,
-                inputs=[msg, chatbot],
+                fn=self.generate_answer,
+                inputs=[msg, chatbot, k_documents, collection_radio, top_p, top_k, temp, model_selector],
                 outputs=[msg, chatbot],
-                queue=False,
-            ).success(
-                fn=self.retrieve,
-                inputs=[chatbot, db, collection_radio, k_documents],
-                outputs=[retrieved_docs],
-                queue=True,
-            ).success(
-                fn=self.bot,
-                inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector],
-                outputs=chatbot,
                 queue=True
             )
 
-            # Regenerate
-            regenerate_click_event = regenerate.click(
-                fn=self.regenerate_response,
-                inputs=chatbot,
-                outputs=[msg, chatbot],
-                queue=False,
-            ).success(
-                fn=self.retrieve,
-                inputs=[chatbot, db, collection_radio, k_documents],
-                outputs=[retrieved_docs],
-                queue=True,
-            ).success(
-                fn=self.bot,
-                inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector],
-                outputs=chatbot,
-                queue=True
-            )
+            # # Regenerate
+            # regenerate_click_event = regenerate.click(
+            #     fn=self.regenerate_response,
+            #     inputs=chatbot,
+            #     outputs=[msg, chatbot],
+            #     queue=False,
+            # ).success(
+            #     fn=self.retrieve,
+            #     inputs=[chatbot, db, collection_radio, k_documents],
+            #     outputs=[retrieved_docs],
+            #     queue=True,
+            # ).success(
+            #     fn=self.bot,
+            #     inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector],
+            #     outputs=chatbot,
+            #     queue=True
+            # )
 
-            # Stop generation
-            stop.click(
-                fn=None,
-                inputs=None,
-                outputs=None,
-                cancels=[submit_event, submit_click_event, regenerate_click_event],
-                queue=False,
-            )
+            # # Stop generation
+            # stop.click(
+            #     fn=None,
+            #     inputs=None,
+            #     outputs=None,
+            #     cancels=[submit_event, submit_click_event, regenerate_click_event],
+            #     queue=False,
+            # )
 
             # Clear history
             clear.click(lambda: None, None, chatbot, queue=False)
 
         demo.queue(max_size=128, api_open=False)
         demo.launch(server_name="0.0.0.0")
+        return demo
 
 
-if __name__ == "__main__":
-    local_chat_gpt = LocalChatGPT()
-    local_chat_gpt.run()
+@app.task
+def send_message(message: str):
+    # logger.info(f"Message is {message}")
+    return message
+#
+#
+# @app.task
+# def receive_answer(answer: str):
+#     # logger.info(f"Answer is {answer}")
+#     return answer
+
+
+local_gpt = LocalChatGPT()
+
+
+@app.task
+def receive_answer(message, chatbot, k_documents, collection_radio, top_p, top_k, temp, model_selector):
+    print("receive_answer")
+    print(k_documents)
+    chatbot = local_gpt.bot(message, chatbot, k_documents, collection_radio, top_p, top_k, temp, model_selector)
+    print(chatbot)
+    return chatbot
+
+
+@app.task
+def run():
+    return local_gpt.run()
+
+
+result = run.delay()
+print(result.id)
+
+# if __name__ == "__main__":
+#     local_chat_gpt = LocalChatGPT()
+#     blocks = local_chat_gpt.run()
+# app = gr.mount_gradio_app(app, blocks, path="/")
+# # Then run `uvicorn run:app` from the terminal and navigate to http://localhost:8000/.
+# uvicorn.run(app, host="0.0.0.0", port=8001, log_config=None)

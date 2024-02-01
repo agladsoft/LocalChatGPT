@@ -1,23 +1,59 @@
 version: '3.9'
 services:
-  chatbot:
-    container_name: chatbot
-    build: .
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [ gpu ]
-    restart: always
+#  chatbot:
+#    container_name: chatbot
+#    build: .
+#    restart: always
+#    volumes:
+#      - ./models:/models  # Монтируйте папку с моделями внутрь контейнера
+#      - ./chroma:/chroma
+#      - ./upload_files:/upload_files
+#      - ./scripts:/app
+#    environment:
+#      CELERY_BROKER_URL: redis://redis
+#      CELERY_RESULT_BACKEND: redis://redis
+#    ports:
+#      - "7860:7860"
+#    networks:
+#      - db
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - db
+
+  worker:
+    container_name: worker
+    build: ./
+    command: celery -A app worker -l info -E
+    user: nobody
     volumes:
+      - ./scripts:/data
       - ./models:/models  # Монтируйте папку с моделями внутрь контейнера
       - ./chroma:/chroma
       - ./upload_files:/upload_files
-      - ./scripts:/app
+    environment:
+      CELERY_BROKER_URL: redis://redis
+      CELERY_RESULT_BACKEND: redis://redis
+      PYTHONPATH: /data
     ports:
       - "7860:7860"
+    depends_on:
+      - redis
+    networks:
+      - db
+
+  flower:
+    image: mher/flower:0.9.7
+    container_name: flower
+    command: [ 'flower', '--broker=redis://redis', '--port=5555' ]
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
     networks:
       - db
 
