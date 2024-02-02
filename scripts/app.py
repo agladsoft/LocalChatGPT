@@ -223,7 +223,7 @@ class LocalChatGPT:
         chatbot = receive_answer.delay(chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector)
         print("Bot - ", chatbot.id)
         while chatbot.state == 'PENDING':
-            print(chatbot.result)
+            pass
         print(chatbot.state)
         yield chatbot.result
 
