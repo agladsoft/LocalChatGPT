@@ -219,12 +219,13 @@ class LocalChatGPT:
             return gr.update(placeholder=self.system_prompt, interactive=False)
 
     @staticmethod
-    def generate_answer(msg, chatbot, k_documents, collection_radio, top_p, top_k, temp, model_selector):
-        print("start generate_answer")
-        msg = receive_answer.apply_async(args=[msg, chatbot, k_documents, collection_radio, top_p, top_k, temp, model_selector])
-        print(msg)
-        print("end generate_answer")
-        return "", chatbot
+    def generate_answer(chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector):
+        chatbot = receive_answer.delay(chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector)
+        print("Bot - ", chatbot.id)
+        while chatbot.state == 'PENDING':
+            print(chatbot.result)
+        print(chatbot.state)
+        yield chatbot.result
 
     @staticmethod
     def user(message, history):
@@ -268,7 +269,7 @@ class LocalChatGPT:
         # logger.info("Получили контекст из базы")
         return "\n\n\n".join(list_data) if list_data else "Документов в базе нету"
 
-    def bot(self, message, history, k_documents, collection_radio, top_p, top_k, temp, model_selector):
+    def bot(self, history, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector):
         """
 
         :param history:
@@ -280,10 +281,8 @@ class LocalChatGPT:
         :param model_selector:
         :return:
         """
-        message, history = self.user(message, history)
-        retrieved_docs = self.retrieve(history, collection_radio, k_documents)
-        # if not history or not history[-1][0]:
-        #     return
+        if not history or not history[-1][0]:
+            return
         model = next((model for model in self.llama_models if model_selector in model.model_path), None)
         tokens = self.get_system_tokens(model)[:]
         tokens.append(LINEBREAK_TOKEN)
@@ -318,7 +317,6 @@ class LocalChatGPT:
                 break
             partial_text += model.detokenize([token]).decode("utf-8", "ignore")
             history[-1][1] = partial_text
-
         if files:
             partial_text += SOURCES_SEPARATOR
             sources_text = "\n\n\n".join(
@@ -327,8 +325,7 @@ class LocalChatGPT:
             )
             partial_text += sources_text
             history[-1][1] = partial_text
-        print(partial_text)
-        return partial_text
+        return history
 
     def ingest_files(self):
         self.load_db()
@@ -584,9 +581,19 @@ class LocalChatGPT:
 
             # Pressing the button
             submit_click_event = submit.click(
-                fn=self.generate_answer,
-                inputs=[msg, chatbot, k_documents, collection_radio, top_p, top_k, temp, model_selector],
+                fn=self.user,
+                inputs=[msg, chatbot],
                 outputs=[msg, chatbot],
+                queue=False,
+            ).success(
+                fn=self.retrieve,
+                inputs=[chatbot, collection_radio, k_documents],
+                outputs=[retrieved_docs],
+                queue=True,
+            ).success(
+                fn=self.generate_answer,
+                inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector],
+                outputs=chatbot,
                 queue=True
             )
 
@@ -641,11 +648,8 @@ local_gpt = LocalChatGPT()
 
 
 @app.task
-def receive_answer(message, chatbot, k_documents, collection_radio, top_p, top_k, temp, model_selector):
-    print("receive_answer")
-    print(k_documents)
-    chatbot = local_gpt.bot(message, chatbot, k_documents, collection_radio, top_p, top_k, temp, model_selector)
-    print(chatbot)
+def receive_answer(chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector):
+    chatbot = local_gpt.bot(chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector)
     return chatbot
 
 
@@ -655,7 +659,6 @@ def run():
 
 
 result = run.delay()
-print(result.id)
 
 # if __name__ == "__main__":
 #     local_chat_gpt = LocalChatGPT()
