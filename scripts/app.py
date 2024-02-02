@@ -1,5 +1,7 @@
 import re
 import csv
+import time
+
 import uvicorn
 import os.path
 import chromadb
@@ -221,11 +223,13 @@ class LocalChatGPT:
     @staticmethod
     def generate_answer(chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector):
         chatbot = receive_answer.delay(chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector)
-        print("Bot - ", chatbot.id)
         while chatbot.state == 'PENDING':
             pass
-        print(chatbot.state)
-        yield chatbot.result
+        while chatbot.state == 'PROGRESS':
+            yield chatbot.info.get('progress')
+            time.sleep(0.1)
+        print(f"Status is {chatbot.state}")
+        yield chatbot.info.get('result')
 
     @staticmethod
     def user(message, history):
@@ -317,6 +321,7 @@ class LocalChatGPT:
                 break
             partial_text += model.detokenize([token]).decode("utf-8", "ignore")
             history[-1][1] = partial_text
+            yield history
         if files:
             partial_text += SOURCES_SEPARATOR
             sources_text = "\n\n\n".join(
@@ -325,7 +330,7 @@ class LocalChatGPT:
             )
             partial_text += sources_text
             history[-1][1] = partial_text
-        return history
+        yield history
 
     def ingest_files(self):
         self.load_db()
@@ -647,10 +652,15 @@ def send_message(message: str):
 local_gpt = LocalChatGPT()
 
 
-@app.task
-def receive_answer(chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector):
+@app.task(bind=True)
+def receive_answer(self, chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector):
+    letters = None
     chatbot = local_gpt.bot(chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector)
-    return chatbot
+    for letters in chatbot:
+        print(f"Result is {letters}")
+        self.update_state(state='PROGRESS', meta={'progress': letters})
+    self.update_state(state='SUCCESS', meta={'result': letters})
+    return letters[-1][1]
 
 
 @app.task
