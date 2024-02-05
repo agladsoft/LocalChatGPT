@@ -1,8 +1,6 @@
 import re
 import csv
 import time
-
-import uvicorn
 import os.path
 import chromadb
 import tempfile
@@ -11,9 +9,7 @@ import gradio as gr
 from re import Pattern
 from __init__ import *
 from celery import Celery
-from fastapi import FastAPI
 from llama_cpp import Llama
-from datetime import datetime
 from gradio.themes.utils import sizes
 from langchain.vectorstores import Chroma
 from typing import List, Optional, Union, Tuple
@@ -22,9 +18,8 @@ from huggingface_hub.file_download import http_get
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
-# app = FastAPI()
-# logger: logging.getLogger = get_logger(os.path.basename(__file__).replace(".py", "_")
-#                                        + str(datetime.now().date()))
+
+logger = logging.getLogger(__name__)
 app_celery = Celery(
     "tasks",
     broker=os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0'),
@@ -200,7 +195,7 @@ class LocalChatGPT:
             collection_name=self.collection,
         )
         file_warning = f"Загружено {len(fixed_documents)} фрагментов! Можно задавать вопросы."
-        # os.chmod(FILES_DIR, 0o0777)
+        os.chmod(FILES_DIR, 0o0777)
         return file_warning
 
     @staticmethod
@@ -221,8 +216,9 @@ class LocalChatGPT:
             return gr.update(placeholder=self.system_prompt, interactive=False)
 
     @staticmethod
-    def generate_answer(chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector):
-        chatbot = receive_answer.delay(chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector)
+    def generate_answer(chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector, scores):
+        chatbot = receive_answer.delay(chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector,
+                                       scores, message=chatbot[-1][0])
         while chatbot.state == 'PENDING':
             pass
         while chatbot.state == 'PROGRESS':
@@ -233,9 +229,11 @@ class LocalChatGPT:
 
     @staticmethod
     def user(message, history):
+        logger.info("Обработка вопроса")
         if history is None:
             history = []
         new_history = history + [[message, None]]
+        logger.info("Закончена обработка вопроса")
         return "", new_history
 
     @staticmethod
@@ -247,31 +245,36 @@ class LocalChatGPT:
         """
         return "", history
 
-    def retrieve(self, history, collection_radio, k_documents: int) -> Union[list, str]:
+    def retrieve(self, history, collection_radio, k_documents: int, scores) -> Tuple[str, list]:
         """
 
         :param history:
         :param collection_radio:
         :param k_documents:
+        :param scores:
         :return:
         """
-        print(self.db)
         if not self.db or collection_radio != MODES[0] or not history or not history[-1][0]:
-            return "Появятся после задавания вопросов"
+            return "Появятся после задавания вопросов", []
         last_user_message = history[-1][0]
         docs = self.db.similarity_search_with_score(last_user_message, k_documents)
+        scores: list = []
         data: dict = {}
         for doc in docs:
             url = f"""<a href="file/{doc[0].metadata["source"]}" target="_blank" 
                 rel="noopener noreferrer">{os.path.basename(doc[0].metadata["source"])}</a>"""
             document: str = f'Документ - {url} ↓'
+            score: float = round(doc[1], 2)
+            scores.append(score)
             if document in data:
-                data[document] += "\n\n" + f"Score: {round(doc[1], 2)}, Text: {doc[0].page_content}"
+                data[document] += "\n\n" + f"Score: {score}, Text: {doc[0].page_content}"
             else:
-                data[document] = f"Score: {round(doc[1], 2)}, Text: {doc[0].page_content}"
+                data[document] = f"Score: {score}, Text: {doc[0].page_content}"
         list_data: list = [f"{doc}\n\n{text}" for doc, text in data.items()]
-        # logger.info("Получили контекст из базы")
-        return "\n\n\n".join(list_data) if list_data else "Документов в базе нету"
+        logger.info("Получили контекст из базы")
+        if not list_data:
+            return "Документов в базе нету", scores
+        return "\n\n\n".join(list_data), scores
 
     def ingest_files(self):
         self.load_db()
@@ -333,6 +336,7 @@ class LocalChatGPT:
             gr.Markdown(
                 f"""<h1><center>{favicon} Я, Макар - виртуальный ассистент Рускон</center></h1>"""
             )
+            scores = gr.State(None)
 
             with gr.Tab("Чат"):
                 with gr.Accordion("Параметры", open=False):
@@ -453,8 +457,8 @@ class LocalChatGPT:
                 with gr.Row(elem_id="buttons"):
                     gr.Button(value="👍 Понравилось")
                     gr.Button(value="👎 Не понравилось")
-                    stop = gr.Button(value="⛔ Остановить")
-                    regenerate = gr.Button(value="🔄 Повторить")
+                    # stop = gr.Button(value="⛔ Остановить")
+                    # regenerate = gr.Button(value="🔄 Повторить")
                     clear = gr.Button(value="🗑️ Очистить")
 
                 with gr.Row():
@@ -508,37 +512,37 @@ class LocalChatGPT:
             )
 
             # Pressing Enter
-            submit_event = msg.submit(
+            msg.submit(
                 fn=self.user,
                 inputs=[msg, chatbot],
                 outputs=[msg, chatbot],
                 queue=False,
             ).success(
                 fn=self.retrieve,
-                inputs=[chatbot, collection_radio, k_documents],
-                outputs=[retrieved_docs],
+                inputs=[chatbot, collection_radio, k_documents, scores],
+                outputs=[retrieved_docs, scores],
                 queue=True,
             ).success(
                 fn=self.generate_answer,
-                inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector],
+                inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector, scores],
                 outputs=chatbot,
                 queue=True
             )
 
             # Pressing the button
-            submit_click_event = submit.click(
+            submit.click(
                 fn=self.user,
                 inputs=[msg, chatbot],
                 outputs=[msg, chatbot],
                 queue=False,
             ).success(
                 fn=self.retrieve,
-                inputs=[chatbot, collection_radio, k_documents],
-                outputs=[retrieved_docs],
+                inputs=[chatbot, collection_radio, k_documents, scores],
+                outputs=[retrieved_docs, scores],
                 queue=True,
             ).success(
                 fn=self.generate_answer,
-                inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector],
+                inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector, scores],
                 outputs=chatbot,
                 queue=True
             )
@@ -575,14 +579,14 @@ class LocalChatGPT:
 
         demo.queue(max_size=128, api_open=False)
         demo.launch(server_name="0.0.0.0")
-        return demo
 
 
 llm_model = None
 
 
 @app_celery.task(bind=True)
-def receive_answer(self, chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector):
+def receive_answer(self, chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector, scores,
+                   message=""):
     from llm import LLM
 
     global llm_model
@@ -590,9 +594,9 @@ def receive_answer(self, chatbot, collection_radio, retrieved_docs, top_p, top_k
     if not llm_model:
         llm_model = LLM()
     letters = None
-    chatbot = llm_model.bot(chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector)
+    chatbot = llm_model.bot(chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector, scores,
+                            message=message)
     for letters in chatbot:
-        print(f"Result is {letters}")
         self.update_state(state='PROGRESS', meta={'progress': letters})
     self.update_state(state='SUCCESS', meta={'result': letters})
     return letters[-1][1]

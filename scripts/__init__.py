@@ -76,10 +76,10 @@ AVATAR_USER = os.path.join(ABS_PATH, "icons8-человек-96.png")
 AVATAR_BOT = os.path.join(ABS_PATH, "icons8-bot-96.png")
 SOURCES_SEPARATOR = "\n\n Документы: \n"
 
-# FILES_DIR = os.path.join(ABS_PATH, "../upload_files")
-# os.makedirs(FILES_DIR, exist_ok=True)
-# os.chmod(FILES_DIR, 0o0777)
-# os.environ['GRADIO_TEMP_DIR'] = FILES_DIR
+FILES_DIR = os.path.join(ABS_PATH, "../upload_files")
+os.makedirs(FILES_DIR, exist_ok=True)
+os.chmod(FILES_DIR, 0o0777)
+os.environ['GRADIO_TEMP_DIR'] = FILES_DIR
 
 BLOCK_CSS = """
 
@@ -98,31 +98,3 @@ tr span {
 }
 
 """
-
-LOG_FORMAT: str = "[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s"
-DATE_FTM: str = "%d/%B/%Y %H:%M:%S"
-
-
-def get_file_handler(name: str) -> logging.FileHandler:
-    if not os.path.exists(LOGGING_DIR):
-        os.mkdir(LOGGING_DIR)
-    file_handler: logging.FileHandler = logging.FileHandler(f"{LOGGING_DIR}/{name}.log")
-    file_handler.setFormatter(logging.Formatter(LOG_FORMAT, datefmt=DATE_FTM))
-    return file_handler
-
-
-def get_stream_handler():
-    stream_handler: logging.StreamHandler = logging.StreamHandler()
-    stream_handler.setLevel(logging.INFO)
-    stream_handler.setFormatter(logging.Formatter(LOG_FORMAT))
-    return stream_handler
-
-
-def get_logger(name: str) -> logging.getLogger:
-    logger: logging.getLogger = logging.getLogger(name)
-    if logger.hasHandlers():
-        logger.handlers.clear()
-    logger.addHandler(get_file_handler(name))
-    logger.addHandler(get_stream_handler())
-    logger.setLevel(logging.INFO)
-    return logger
