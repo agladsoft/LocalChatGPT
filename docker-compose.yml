@@ -13,7 +13,7 @@ services:
     container_name: chatbot
     build: .
     restart: always
-    command: python3 -u llm.py
+    command: python3 -u app.py
     volumes:
       - ./models:/models  # Монтируйте папку с моделями внутрь контейнера
       - ./chroma:/chroma
@@ -32,7 +32,7 @@ services:
     container_name: worker
     build: ./
     restart: always
-    command: celery -A app worker -l info -E
+    command: celery -A llm worker -l info -E
     volumes:
       - ./scripts:/data
       - ./models:/models  # Монтируйте папку с моделями внутрь контейнера

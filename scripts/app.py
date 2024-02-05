@@ -217,6 +217,7 @@ class LocalChatGPT:
 
     @staticmethod
     def generate_answer(chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector, scores):
+        from llm import receive_answer
         chatbot = receive_answer.delay(chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector,
                                        scores, message=chatbot[-1][0])
         while chatbot.state == 'PENDING':
@@ -581,22 +582,6 @@ class LocalChatGPT:
         demo.launch(server_name="0.0.0.0")
 
 
-llm_model = None
-
-
-@app_celery.task(bind=True)
-def receive_answer(self, chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector, scores,
-                   message=""):
-    from llm import LLM
-
-    global llm_model
-
-    if not llm_model:
-        llm_model = LLM()
-    letters = None
-    chatbot = llm_model.bot(chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector, scores,
-                            message=message)
-    for letters in chatbot:
-        self.update_state(state='PROGRESS', meta={'progress': letters})
-    self.update_state(state='SUCCESS', meta={'result': letters})
-    return letters[-1][1]
+if __name__ == "__main__":
+    local_chat_gpt = LocalChatGPT()
+    local_chat_gpt.run()

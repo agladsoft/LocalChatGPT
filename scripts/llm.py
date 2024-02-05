@@ -2,7 +2,7 @@ import re
 from __init__ import *
 from datetime import datetime
 from logging_custom import FileLogger
-from app import LocalChatGPT, LINEBREAK_TOKEN, MODES, BOT_TOKEN, MAX_NEW_TOKENS, SOURCES_SEPARATOR
+from app import app_celery, LocalChatGPT, LINEBREAK_TOKEN, MODES, BOT_TOKEN, MAX_NEW_TOKENS, SOURCES_SEPARATOR
 
 
 logger = logging.getLogger(__name__)
@@ -64,7 +64,6 @@ class LLM(LocalChatGPT):
             top_p=top_p,
             temp=temp
         )
-        # logger.info("Осуществляется генерации ответа")
         partial_text = ""
         logger.info("Начинается генерация ответа")
         f_logger.finfo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] - Ответ: ")
@@ -96,6 +95,21 @@ class LLM(LocalChatGPT):
         yield history
 
 
-if __name__ == "__main__":
-    local_chat_gpt = LocalChatGPT()
-    local_chat_gpt.run()
+llm_model = None
+
+
+@app_celery.task(bind=True)
+def receive_answer(self, chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector, scores,
+                   message=""):
+
+    global llm_model
+
+    if not llm_model:
+        llm_model = LLM()
+    letters = None
+    chatbot = llm_model.bot(chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector, scores,
+                            message=message)
+    for letters in chatbot:
+        self.update_state(state='PROGRESS', meta={'progress': letters})
+    self.update_state(state='SUCCESS', meta={'result': letters})
+    return letters[-1][1]
