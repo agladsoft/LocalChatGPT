@@ -3,7 +3,9 @@ FROM nvidia/cuda:12.2.2-devel-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive \
     CMAKE_ARGS="-DLLAMA_CUBLAS=ON" \
-    FORCE_CMAKE=1
+    FORCE_CMAKE=1 \
+    PYTHONHASHSEED=random \
+    PYTHONDONTWRITEBYTECODE=1
 
 # Обновляем пакеты и устанавливаем libreoffice
 RUN apt update -y && apt upgrade -y && apt install libreoffice -y && apt install pip -y  \
@@ -19,9 +21,5 @@ WORKDIR /app
 
 # Не копируйте большие модели в образ, так как это может сделать его слишком объемным
 # Вместо этого, они будут подключены через volumes в docker-compose.yml
-
-RUN pip install --no-cache-dir redis flower
-
-ENV PYTHONHASHSEED=random PYTHONDONTWRITEBYTECODE=1
 # Запустите скрипт при запуске контейнера
 #CMD ["python3", "-u", "app.py"]
