@@ -25,50 +25,50 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 # app = FastAPI()
 # logger: logging.getLogger = get_logger(os.path.basename(__file__).replace(".py", "_")
 #                                        + str(datetime.now().date()))
-app = Celery(
+app_celery = Celery(
     "tasks",
     broker=os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0'),
     backend=os.environ.get('CELERY_RESULT_BACKEND', 'redis://localhost:6379/1')
 )
-app.conf.accept_content = ['pickle', 'json', 'msgpack', 'yaml']
-app.conf.worker_send_task_events = True
-
-
-def initialize_app() -> Tuple[List[Llama], HuggingFaceEmbeddings]:
-    """
-    Загружаем все модели из списка.
-    :return:
-    """
-    llama_models: list = []
-    os.makedirs(MODELS_DIR, exist_ok=True)
-    for model_url, model_name in list(DICT_REPO_AND_MODELS.items()):
-        final_model_path = os.path.join(MODELS_DIR, model_name)
-        os.makedirs(os.path.dirname(final_model_path), exist_ok=True)
-
-        if not os.path.exists(final_model_path):
-            with open(final_model_path, "wb") as f:
-                http_get(model_url, f)
-
-        llama_models.append(Llama(
-            # n_gpu_layers=35,
-            model_path=final_model_path,
-            n_ctx=CONTEXT_SIZE,
-            n_parts=1,
-        ))
-
-    return llama_models, HuggingFaceEmbeddings(model_name=EMBEDDER_NAME, cache_folder=MODELS_DIR)
+app_celery.conf.accept_content = ['pickle', 'json', 'msgpack', 'yaml']
+app_celery.conf.worker_send_task_events = True
 
 
 class LocalChatGPT:
-    llama_models, embeddings = initialize_app()
 
     def __init__(self):
+        self.llama_models = None
+        self.embeddings = None
         self.db: Optional[Chroma] = None
         self.llama_model: Optional[Llama] = None
-        # self.llama_models, self.embeddings = initialize_app()
         self.collection: str = "all-documents"
         self.mode: str = MODES[0]
         self.system_prompt = self._get_default_system_prompt(self.mode)
+
+    @staticmethod
+    def initialize_app() -> Tuple[List[Llama], HuggingFaceEmbeddings]:
+        """
+        Загружаем все модели из списка.
+        :return:
+        """
+        llama_models: list = []
+        os.makedirs(MODELS_DIR, exist_ok=True)
+        for model_url, model_name in list(DICT_REPO_AND_MODELS.items()):
+            final_model_path = os.path.join(MODELS_DIR, model_name)
+            os.makedirs(os.path.dirname(final_model_path), exist_ok=True)
+
+            if not os.path.exists(final_model_path):
+                with open(final_model_path, "wb") as f:
+                    http_get(model_url, f)
+
+            llama_models.append(Llama(
+                # n_gpu_layers=35,
+                model_path=final_model_path,
+                n_ctx=CONTEXT_SIZE,
+                n_parts=1,
+            ))
+
+        return llama_models, HuggingFaceEmbeddings(model_name=EMBEDDER_NAME, cache_folder=MODELS_DIR)
 
     @staticmethod
     def load_single_document(file_path: str) -> Document:
@@ -272,65 +272,6 @@ class LocalChatGPT:
         list_data: list = [f"{doc}\n\n{text}" for doc, text in data.items()]
         # logger.info("Получили контекст из базы")
         return "\n\n\n".join(list_data) if list_data else "Документов в базе нету"
-
-    def bot(self, history, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector):
-        """
-
-        :param history:
-        :param collection_radio:
-        :param retrieved_docs:
-        :param top_p:
-        :param top_k:
-        :param temp:
-        :param model_selector:
-        :return:
-        """
-        if not history or not history[-1][0]:
-            return
-        model = next((model for model in self.llama_models if model_selector in model.model_path), None)
-        tokens = self.get_system_tokens(model)[:]
-        tokens.append(LINEBREAK_TOKEN)
-
-        for user_message, bot_message in history[-4:-1]:
-            message_tokens = self.get_message_tokens(model=model, role="user", content=user_message)
-            tokens.extend(message_tokens)
-
-        last_user_message = history[-1][0]
-        pattern = r'<a\s+[^>]*>(.*?)</a>'
-        files = re.findall(pattern, retrieved_docs)
-        for file in files:
-            retrieved_docs = re.sub(fr'<a\s+[^>]*>{file}</a>', file, retrieved_docs)
-        if retrieved_docs and collection_radio == MODES[0]:
-            last_user_message = f"Контекст: {retrieved_docs}\n\nИспользуя только контекст, ответь на вопрос: " \
-                                    f"{last_user_message}"
-        message_tokens = self.get_message_tokens(model=model, role="user", content=last_user_message)
-        tokens.extend(message_tokens)
-
-        role_tokens = [model.token_bos(), BOT_TOKEN, LINEBREAK_TOKEN]
-        tokens.extend(role_tokens)
-        generator = model.generate(
-            tokens,
-            top_k=top_k,
-            top_p=top_p,
-            temp=temp
-        )
-        # logger.info("Осуществляется генерации ответа")
-        partial_text = ""
-        for i, token in enumerate(generator):
-            if token == model.token_eos() or (MAX_NEW_TOKENS is not None and i >= MAX_NEW_TOKENS):
-                break
-            partial_text += model.detokenize([token]).decode("utf-8", "ignore")
-            history[-1][1] = partial_text
-            yield history
-        if files:
-            partial_text += SOURCES_SEPARATOR
-            sources_text = "\n\n\n".join(
-                f"{index}. {source}"
-                for index, source in enumerate(files, start=1)
-            )
-            partial_text += sources_text
-            history[-1][1] = partial_text
-        yield history
 
     def ingest_files(self):
         self.load_db()
@@ -566,23 +507,23 @@ class LocalChatGPT:
                 outputs=[find_doc, ingested_dataset]
             )
 
-            # # Pressing Enter
-            # submit_event = msg.submit(
-            #     fn=self.user,
-            #     inputs=[msg, chatbot],
-            #     outputs=[msg, chatbot],
-            #     queue=False,
-            # ).success(
-            #     fn=self.retrieve,
-            #     inputs=[chatbot, db, collection_radio, k_documents],
-            #     outputs=[retrieved_docs],
-            #     queue=True,
-            # ).success(
-            #     fn=self.bot,
-            #     inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector],
-            #     outputs=chatbot,
-            #     queue=True
-            # )
+            # Pressing Enter
+            submit_event = msg.submit(
+                fn=self.user,
+                inputs=[msg, chatbot],
+                outputs=[msg, chatbot],
+                queue=False,
+            ).success(
+                fn=self.retrieve,
+                inputs=[chatbot, collection_radio, k_documents],
+                outputs=[retrieved_docs],
+                queue=True,
+            ).success(
+                fn=self.generate_answer,
+                inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector],
+                outputs=chatbot,
+                queue=True
+            )
 
             # Pressing the button
             submit_click_event = submit.click(
@@ -637,42 +578,21 @@ class LocalChatGPT:
         return demo
 
 
-@app.task
-def send_message(message: str):
-    # logger.info(f"Message is {message}")
-    return message
-#
-#
-# @app.task
-# def receive_answer(answer: str):
-#     # logger.info(f"Answer is {answer}")
-#     return answer
+llm_model = None
 
 
-local_gpt = LocalChatGPT()
-
-
-@app.task(bind=True)
+@app_celery.task(bind=True)
 def receive_answer(self, chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector):
+    from llm import LLM
+
+    global llm_model
+
+    if not llm_model:
+        llm_model = LLM()
     letters = None
-    chatbot = local_gpt.bot(chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector)
+    chatbot = llm_model.bot(chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector)
     for letters in chatbot:
         print(f"Result is {letters}")
         self.update_state(state='PROGRESS', meta={'progress': letters})
     self.update_state(state='SUCCESS', meta={'result': letters})
     return letters[-1][1]
-
-
-@app.task
-def run():
-    return local_gpt.run()
-
-
-result = run.delay()
-
-# if __name__ == "__main__":
-#     local_chat_gpt = LocalChatGPT()
-#     blocks = local_chat_gpt.run()
-# app = gr.mount_gradio_app(app, blocks, path="/")
-# # Then run `uvicorn run:app` from the terminal and navigate to http://localhost:8000/.
-# uvicorn.run(app, host="0.0.0.0", port=8001, log_config=None)
