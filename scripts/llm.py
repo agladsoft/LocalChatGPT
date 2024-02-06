@@ -15,7 +15,7 @@ f_logger = FileLogger(__name__, f"{LOGGING_DIR}/answers_bot.log", mode='a', leve
 class LLM(LocalChatGPT):
     def __init__(self):
         super().__init__()
-        self.llama_models, self.embeddings = self.initialize_app()
+        self.llama_models = self.initialize_app()
 
     def bot(self, history, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector, scores, message):
         """

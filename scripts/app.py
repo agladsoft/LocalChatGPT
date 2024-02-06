@@ -33,7 +33,7 @@ class LocalChatGPT:
 
     def __init__(self):
         self.llama_models = None
-        self.embeddings = None
+        self.embeddings = HuggingFaceEmbeddings(model_name=EMBEDDER_NAME, cache_folder=MODELS_DIR)
         self.db: Optional[Chroma] = None
         self.llama_model: Optional[Llama] = None
         self.collection: str = "all-documents"
@@ -41,7 +41,7 @@ class LocalChatGPT:
         self.system_prompt = self._get_default_system_prompt(self.mode)
 
     @staticmethod
-    def initialize_app() -> Tuple[List[Llama], HuggingFaceEmbeddings]:
+    def initialize_app() -> List[Llama]:
         """
         Загружаем все модели из списка.
         :return:
@@ -63,7 +63,7 @@ class LocalChatGPT:
                 n_parts=1,
             ))
 
-        return llama_models, HuggingFaceEmbeddings(model_name=EMBEDDER_NAME, cache_folder=MODELS_DIR)
+        return llama_models
 
     @staticmethod
     def load_single_document(file_path: str) -> Document:
@@ -143,7 +143,7 @@ class LocalChatGPT:
             for file in same_files:
                 pattern: Pattern[str] = re.compile(fr'{file.replace(".txt", "")}\d*$')
                 self.db.delete([x for x in data['ids'] if pattern.match(x)])
-            db = self.db.from_documents(
+            self.db = self.db.from_documents(
                 documents=fixed_documents,
                 embedding=self.embeddings,
                 ids=ids,
@@ -151,7 +151,7 @@ class LocalChatGPT:
                 collection_name=self.collection,
             )
             file_warning = f"Загружено {len(fixed_documents)} фрагментов! Можно задавать вопросы."
-            return True, db, file_warning
+            return True, file_warning
         return False, "Фрагменты ещё не загружены!"
 
     def build_index(
@@ -246,18 +246,18 @@ class LocalChatGPT:
         """
         return "", history
 
-    def retrieve(self, history, collection_radio, k_documents: int, scores) -> Tuple[str, list]:
+    def retrieve(self, history, collection_radio, k_documents: int) -> Tuple[str, list]:
         """
 
         :param history:
         :param collection_radio:
         :param k_documents:
-        :param scores:
         :return:
         """
         if not self.db or collection_radio != MODES[0] or not history or not history[-1][0]:
             return "Появятся после задавания вопросов", []
         last_user_message = history[-1][0]
+        print(last_user_message, k_documents)
         docs = self.db.similarity_search_with_score(last_user_message, k_documents)
         scores: list = []
         data: dict = {}
@@ -520,7 +520,7 @@ class LocalChatGPT:
                 queue=False,
             ).success(
                 fn=self.retrieve,
-                inputs=[chatbot, collection_radio, k_documents, scores],
+                inputs=[chatbot, collection_radio, k_documents],
                 outputs=[retrieved_docs, scores],
                 queue=True,
             ).success(
@@ -538,7 +538,7 @@ class LocalChatGPT:
                 queue=False,
             ).success(
                 fn=self.retrieve,
-                inputs=[chatbot, collection_radio, k_documents, scores],
+                inputs=[chatbot, collection_radio, k_documents],
                 outputs=[retrieved_docs, scores],
                 queue=True,
             ).success(
