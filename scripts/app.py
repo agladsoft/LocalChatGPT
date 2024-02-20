@@ -2,7 +2,9 @@ import re
 import csv
 import time
 import os.path
+import logging
 import chromadb
+import datetime
 import tempfile
 import pandas as pd
 import gradio as gr
@@ -10,13 +12,13 @@ from re import Pattern
 from __init__ import *
 from celery import Celery
 from llama_cpp import Llama
-from gradio.themes.utils import sizes
+from tinydb import TinyDB, where
 from langchain.vectorstores import Chroma
 from typing import List, Optional, Union, Tuple
 from langchain.docstore.document import Document
 from huggingface_hub.file_download import http_get
+from langchain.text_splitter import SpacyTextSplitter
 from langchain.embeddings import HuggingFaceEmbeddings
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 
 logger = logging.getLogger(__name__)
@@ -27,6 +29,7 @@ app_celery = Celery(
 )
 app_celery.conf.accept_content = ['pickle', 'json', 'msgpack', 'yaml']
 app_celery.conf.worker_send_task_events = True
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 
 class LocalChatGPT:
@@ -39,6 +42,7 @@ class LocalChatGPT:
         self.collection: str = "all-documents"
         self.mode: str = MODES[0]
         self.system_prompt = self._get_default_system_prompt(self.mode)
+        self.tiny_db = TinyDB(f'{DATA_QUESTIONS}/tiny_db.json', indent=4, ensure_ascii=False)
 
     @staticmethod
     def initialize_app() -> List[Llama]:
@@ -57,7 +61,7 @@ class LocalChatGPT:
                     http_get(model_url, f)
 
             llama_models.append(Llama(
-                n_gpu_layers=35,
+                # n_gpu_layers=43,
                 model_path=final_model_path,
                 n_ctx=CONTEXT_SIZE,
                 n_parts=1,
@@ -130,7 +134,6 @@ class LocalChatGPT:
     ) -> Union[Optional[Chroma], str]:
         """
 
-        :param db:
         :param fixed_documents:
         :param ids:
         :return:
@@ -163,14 +166,13 @@ class LocalChatGPT:
         """
 
         :param file_paths:
-        :param db:
         :param chunk_size:
         :param chunk_overlap:
         :return:
         """
         load_documents: List[Document] = [self.load_single_document(path) for path in file_paths]
-        text_splitter: RecursiveCharacterTextSplitter = RecursiveCharacterTextSplitter(
-           separators=[".\n\n", ".\n"], chunk_size=chunk_size, chunk_overlap=chunk_overlap
+        text_splitter: SpacyTextSplitter = SpacyTextSplitter(
+            pipeline="ru_core_news_md", chunk_size=chunk_size, chunk_overlap=chunk_overlap
         )
         documents = text_splitter.split_documents(load_documents)
         fixed_documents: List[Document] = []
@@ -298,6 +300,36 @@ class LocalChatGPT:
             self.db.delete(for_delete_ids)
         return "", self.ingest_files()
 
+    def get_analytics(self) -> pd.DataFrame:
+        try:
+            return pd.DataFrame(self.tiny_db.all()).sort_values('Старт обработки запроса', ascending=False)
+        except KeyError:
+            return pd.DataFrame(self.tiny_db.all())
+
+    def calculate_analytics(self, messages, analyse=None):
+        message = messages[-1][0] if messages else None
+        answer = messages[-1][1] if message else None
+        filter_query = where('Сообщения') == message
+        if result := self.tiny_db.search(filter_query):
+            if analyse is None:
+                self.tiny_db.update(
+                    {
+                        'Ответы': answer,
+                        'Количество повторений': result[0]['Количество повторений'] + 1,
+                        'Старт обработки запроса': str(datetime.datetime.now())
+                    },
+                    cond=filter_query
+                )
+            else:
+                self.tiny_db.update({'Оценка ответа': analyse}, cond=filter_query)
+                gr.Info("Отзыв ответу поставлен")
+        elif message is not None:
+            self.tiny_db.insert(
+                {'Сообщения': message, 'Ответы': answer, 'Количество повторений': 1, 'Оценка ответа': None,
+                 'Старт обработки запроса': str(datetime.datetime.now())}
+            )
+        return self.get_analytics()
+
     def load_db(self):
         """
 
@@ -331,7 +363,25 @@ class LocalChatGPT:
 
         :return:
         """
-        with gr.Blocks(title="MakarGPT", theme=gr.themes.Soft(text_size=sizes.text_md), css=BLOCK_CSS) as demo:
+        with gr.Blocks(
+                title="MakarGPT",
+                theme=gr.themes.Soft().set(
+                    body_background_fill="white",
+                    block_background_fill="#e1e5e8",
+                    block_label_background_fill="#2042b9",
+                    block_label_background_fill_dark="#2042b9",
+                    block_label_text_color="white",
+                    checkbox_label_background_fill_selected="#1f419b",
+                    checkbox_label_background_fill_selected_dark="#1f419b",
+                    checkbox_background_color_selected="#111d3d",
+                    checkbox_background_color_selected_dark="#111d3d",
+                    input_background_fill="#e1e5e8",
+                    button_primary_background_fill="#1f419b",
+                    button_primary_background_fill_dark="#1f419b",
+                    shadow_drop_lg="5px 5px 5px 5px rgb(0 0 0 / 0.1)"
+                ),
+                css=BLOCK_CSS
+        ) as demo:
             demo.load(self.load_db, inputs=None, outputs=None)
             favicon = f'<img src="{FAVICON_PATH}" width="48px" style="display: inline">'
             gr.Markdown(
@@ -340,12 +390,93 @@ class LocalChatGPT:
             scores = gr.State(None)
 
             with gr.Tab("Чат"):
+                with gr.Row():
+                    collection_radio = gr.Radio(
+                        choices=MODES,
+                        value=self.mode,
+                        show_label=False
+                    )
+
+                with gr.Row():
+                    with gr.Column(scale=10):
+                        chatbot = gr.Chatbot(
+                            label="Диалог",
+                            height=500,
+                            show_copy_button=True,
+                            show_share_button=True,
+                            avatar_images=(
+                                AVATAR_USER,
+                                AVATAR_BOT
+                            )
+                        )
+
+                with gr.Row():
+                    with gr.Column(scale=20):
+                        msg = gr.Textbox(
+                            label="Отправить сообщение",
+                            show_label=False,
+                            placeholder="👉 Напишите запрос",
+                            container=False
+                        )
+                    with gr.Column(scale=3, min_width=100):
+                        submit = gr.Button("📤 Отправить", variant="primary")
+
+                with gr.Row(elem_id="buttons"):
+                    like = gr.Button(value="👍 Понравилось")
+                    dislike = gr.Button(value="👎 Не понравилось")
+                    clear = gr.Button(value="🗑️ Очистить")
+
+                with gr.Row():
+                    gr.Markdown(
+                        "<center>Ассистент может допускать ошибки, поэтому рекомендуем проверять важную информацию. "
+                        "Ответы также не являются призывом к действию</center>"
+                    )
+
+            with gr.Tab("Документы"):
+                with gr.Row():
+                    with gr.Column(scale=3):
+                        upload_button = gr.Files(
+                            label="Загрузка документов",
+                            file_count="multiple"
+                        )
+                        file_paths = gr.State([])
+                        file_warning = gr.Markdown("Фрагменты ещё не загружены!")
+                        find_doc = gr.Textbox(
+                            label="Отправить сообщение",
+                            show_label=False,
+                            placeholder="👉 Напишите название документа",
+                            container=False
+                        )
+                        delete = gr.Button("🧹 Удалить", variant="primary")
+                    with gr.Column(scale=7):
+                        ingested_dataset = gr.List(
+                            self.ingest_files,
+                            headers=["Название файлов"],
+                            interactive=False,
+                            render=False,  # Rendered under the button
+                        )
+                        ingested_dataset.change(
+                            self.ingest_files,
+                            outputs=ingested_dataset,
+                        )
+                        ingested_dataset.render()
+
+            with gr.Tab("Настройки"):
+                with gr.Row(elem_id="model_selector_row"):
+                    models: list = list(DICT_REPO_AND_MODELS.values())
+                    model_selector = gr.Dropdown(
+                        choices=models,
+                        value=models[0] if models else "",
+                        interactive=True,
+                        show_label=False,
+                        container=False,
+                    )
                 with gr.Accordion("Параметры", open=False):
                     with gr.Tab(label="Параметры извлечения фрагментов из текста"):
                         k_documents = gr.Slider(
                             minimum=1,
-                            maximum=7,
-                            value=4,
+                            maximum=12,
+                            value=6,
                             step=1,
                             interactive=True,
                             label="Кол-во фрагментов для контекста"
@@ -353,16 +484,16 @@ class LocalChatGPT:
                     with gr.Tab(label="Параметры нарезки"):
                         chunk_size = gr.Slider(
                             minimum=128,
-                            maximum=1024,
-                            value=1024,
+                            maximum=1792,
+                            value=1408,
                             step=128,
                             interactive=True,
                             label="Размер фрагментов",
                         )
                         chunk_overlap = gr.Slider(
                             minimum=0,
-                            maximum=500,
-                            value=100,
+                            maximum=400,
+                            value=400,
                             step=10,
                             interactive=True,
                             label="Пересечение"
@@ -393,7 +524,19 @@ class LocalChatGPT:
                             label="Temp"
                         )
 
-                with gr.Accordion("Контекст", open=False):
+                with gr.Accordion("Системный промпт", open=False):
+                    system_prompt = gr.Textbox(
+                        placeholder=QUERY_SYSTEM_PROMPT,
+                        lines=5,
+                        show_label=False
+                    )
+                    # On blur, set system prompt to use in queries
+                    system_prompt.blur(
+                        self._set_system_prompt,
+                        inputs=system_prompt,
+                    )
+
+                with gr.Accordion("Контекст", open=True):
                     with gr.Column(variant="compact"):
                         retrieved_docs = gr.Markdown(
                             value="Появятся после задавания вопросов",
@@ -401,98 +544,23 @@ class LocalChatGPT:
                             show_label=True
                         )
 
+            with gr.Tab("Логи диалогов"):
                 with gr.Row():
-                    with gr.Column(scale=4, variant="compact"):
-                        with gr.Row(elem_id="model_selector_row"):
-                            models: list = list(DICT_REPO_AND_MODELS.values())
-                            model_selector = gr.Dropdown(
-                                choices=models,
-                                value=models[0] if models else "",
-                                interactive=True,
-                                show_label=False,
-                                container=False,
-                            )
-                        collection_radio = gr.Radio(
-                            choices=MODES,
-                            value=self.mode,
-                            label="Коллекции",
-                            info="Переключение между выбором коллекций. Нужен ли контекст или нет?"
-                        )
-                        file_output = gr.Files(file_count="multiple", label="Загрузка файлов")
-                        file_paths = gr.State([])
-                        file_warning = gr.Markdown("Фрагменты ещё не загружены!")
-                    with gr.Column(scale=10):
-                        chatbot = gr.Chatbot(
-                            label="Диалог",
-                            height=500,
-                            show_copy_button=True,
-                            show_share_button=True,
-                            avatar_images=(
-                                AVATAR_USER,
-                                AVATAR_BOT
-                            )
-                        )
-                        with gr.Accordion("Системный промпт", open=False):
-                            system_prompt = gr.Textbox(
-                                placeholder=QUERY_SYSTEM_PROMPT,
-                                label="Системный промпт",
-                                lines=2
-                            )
-                            # On blur, set system prompt to use in queries
-                            system_prompt.blur(
-                                self._set_system_prompt,
-                                inputs=system_prompt,
-                            )
-
-                with gr.Row():
-                    with gr.Column(scale=20):
-                        msg = gr.Textbox(
-                            label="Отправить сообщение",
-                            show_label=False,
-                            placeholder="👉 Напишите запрос",
-                            container=False
-                        )
-                    with gr.Column(scale=3, min_width=100):
-                        submit = gr.Button("📤 Отправить", variant="primary")
-
-                with gr.Row(elem_id="buttons"):
-                    gr.Button(value="👍 Понравилось")
-                    gr.Button(value="👎 Не понравилось")
-                    # stop = gr.Button(value="⛔ Остановить")
-                    # regenerate = gr.Button(value="🔄 Повторить")
-                    clear = gr.Button(value="🗑️ Очистить")
-
-                with gr.Row():
-                    gr.Markdown(
-                        "<center>Ассистент может допускать ошибки, поэтому рекомендуем проверять важную информацию. "
-                        "Ответы также не являются призывом к действию</center>"
-                    )
-
-            with gr.Tab("Документы"):
-                with gr.Row():
-                    with gr.Column(scale=3):
-                        find_doc = gr.Textbox(
-                            label="Отправить сообщение",
-                            show_label=False,
-                            placeholder="👉 Напишите название документа",
-                            container=False
-                        )
-                        delete = gr.Button("🧹 Удалить", variant="primary")
-                    with gr.Column(scale=7):
-                        ingested_dataset = gr.List(
-                            value=self.ingest_files,
-                            headers=["Название файлов"],
-                            interactive=False
+                    with gr.Column():
+                        analytics = gr.DataFrame(
+                            value=self.get_analytics,
+                            interactive=False,
+                            wrap=True
                         )
 
             collection_radio.change(
-                self._set_current_mode, inputs=collection_radio, outputs=system_prompt
+                fn=self._set_current_mode, inputs=collection_radio, outputs=system_prompt
             )
 
             # Upload files
-            file_output.upload(
+            upload_button.upload(
                 fn=self.upload_files,
-                inputs=[file_output],
+                inputs=[upload_button],
                 outputs=[file_paths],
                 queue=True,
             ).success(
@@ -548,35 +616,24 @@ class LocalChatGPT:
                 queue=True
             )
 
-            # # Regenerate
-            # regenerate_click_event = regenerate.click(
-            #     fn=self.regenerate_response,
-            #     inputs=chatbot,
-            #     outputs=[msg, chatbot],
-            #     queue=False,
-            # ).success(
-            #     fn=self.retrieve,
-            #     inputs=[chatbot, db, collection_radio, k_documents],
-            #     outputs=[retrieved_docs],
-            #     queue=True,
-            # ).success(
-            #     fn=self.bot,
-            #     inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector],
-            #     outputs=chatbot,
-            #     queue=True
-            # )
+            # Like
+            like.click(
+                fn=self.calculate_analytics,
+                inputs=[chatbot, like],
+                outputs=[analytics],
+                queue=True,
+            )
 
-            # # Stop generation
-            # stop.click(
-            #     fn=None,
-            #     inputs=None,
-            #     outputs=None,
-            #     cancels=[submit_event, submit_click_event, regenerate_click_event],
-            #     queue=False,
-            # )
+            # Dislike
+            dislike.click(
+                fn=self.calculate_analytics,
+                inputs=[chatbot, dislike],
+                outputs=[analytics],
+                queue=True,
+            )
 
             # Clear history
-            clear.click(lambda: None, None, chatbot, queue=False)
+            clear.click(lambda: None, None, chatbot, queue=False, js=JS)
 
         demo.queue(max_size=128, api_open=False)
         demo.launch(server_name="0.0.0.0")

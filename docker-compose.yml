@@ -46,13 +46,6 @@ services:
       C_FORCE_ROOT: "yes"
     ports:
       - "7861:7861"
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [ gpu ]
     depends_on:
       - redis
     networks:

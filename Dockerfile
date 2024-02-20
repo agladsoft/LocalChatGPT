@@ -19,6 +19,8 @@ RUN pip install -r requirements.txt
 RUN mkdir /app && mkdir /app/chroma
 WORKDIR /app
 
+RUN python3 -m spacy download ru_core_news_md
+
 # Не копируйте большие модели в образ, так как это может сделать его слишком объемным
 # Вместо этого, они будут подключены через volumes в docker-compose.yml
 # Запустите скрипт при запуске контейнера

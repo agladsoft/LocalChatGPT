@@ -1,5 +1,4 @@
 import os
-import logging
 from langchain.document_loaders import (
     CSVLoader,
     EverNoteLoader,
@@ -14,7 +13,7 @@ from langchain.document_loaders import (
 )
 
 
-FAVICON_PATH: str = 'https://github.com/agladsoft/LocalChatGPT/blob/main/sclogo1.png?raw=true'
+FAVICON_PATH: str = 'https://i.ibb.co/DGGPZBG/logo.png'
 QUERY_SYSTEM_PROMPT: str = "Вы, Макар - полезный, уважительный и честный ассистент. " \
                      "Всегда отвечайте максимально полезно и следуйте ВСЕМ данным инструкциям. " \
                      "Не спекулируйте и не выдумывайте информацию. " \
@@ -22,8 +21,8 @@ QUERY_SYSTEM_PROMPT: str = "Вы, Макар - полезный, уважите�
 
 LLM_SYSTEM_PROMPT: str = "Вы, Макар - полезный, уважительный и честный ассистент."
 
-MODES: list = ["DB", "LLM"]
-CONTEXT_SIZE = 5000
+MODES: list = ["ВНД", "Свободное общение", "Получение документов"]
+CONTEXT_SIZE = 4000
 SYSTEM_TOKEN: int = 1788
 USER_TOKEN: int = 1404
 BOT_TOKEN: int = 9225
@@ -52,18 +51,12 @@ LOADER_MAPPING: dict = {
 
 
 DICT_REPO_AND_MODELS: dict = {
-    # "https://huggingface.co/IlyaGusev/saiga_mistral_7b_gguf/resolve/main/model-q4_K.gguf":
-    #     "saiga_mistral_7b_gguf/model-q4_K.gguf",
-    "https://huggingface.co/IlyaGusev/saiga2_7b_gguf/resolve/main/model-q5_K.gguf":
-        "saiga2_7b_gguf/model-q5_K.gguf",
-    # "https://huggingface.co/IlyaGusev/saiga2_7b_gguf/resolve/main/model-q4_K.gguf":
-    #     "saiga2_7b_gguf/model-q4_K.gguf",
-    # "https://huggingface.co/IlyaGusev/saiga2_13b_gguf/resolve/main/model-q4_K.gguf":
-    #     "saiga2_13b_gguf/model-q4_K.gguf"
+    "https://huggingface.co/IlyaGusev/saiga2_7b_gguf/resolve/main/model-q3_K.gguf":
+        "saiga2_7b_gguf/model-q3_K.gguf",
 }
 
 
-EMBEDDER_NAME: str = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+EMBEDDER_NAME: str = "intfloat/multilingual-e5-large"
 
 MAX_NEW_TOKENS: int = 1500
 
@@ -71,6 +64,11 @@ ABS_PATH = os.path.dirname(os.path.abspath(__file__))
 DB_DIR = os.path.join(ABS_PATH, "../chroma")
 MODELS_DIR = os.path.join(ABS_PATH, "../models")
 LOGGING_DIR: str = os.path.join(ABS_PATH, "../logging")
+if not os.path.exists(LOGGING_DIR):
+    os.mkdir(LOGGING_DIR)
+DATA_QUESTIONS = os.path.join(ABS_PATH, "../data_questions")
+if not os.path.exists(DATA_QUESTIONS):
+    os.mkdir(DATA_QUESTIONS)
 AUTH_FILE = os.path.join(ABS_PATH, "auth.csv")
 AVATAR_USER = os.path.join(ABS_PATH, "icons8-человек-96.png")
 AVATAR_BOT = os.path.join(ABS_PATH, "icons8-bot-96.png")
@@ -89,12 +87,38 @@ BLOCK_CSS = """
 
 /* Применяем стили для td */
 tr focus {
-  user-select: all; /* Разрешаем выделение текста */
+    user-select: all; /* Разрешаем выделение текста */
 }
 
 /* Применяем стили для ячейки span внутри td */
 tr span {
-  user-select: all; /* Разрешаем выделение текста */
+    user-select: all; /* Разрешаем выделение текста */
 }
 
+.message-bubble-border.svelte-12dsd9j.svelte-12dsd9j.svelte-12dsd9j {
+  border-style: none;
+}
+
+.user {
+    background: #2042b9;
+    color: white;
+}
+
+"""
+
+
+JS = """
+function disable_btn() {
+    var elements = document.getElementsByClassName('wrap default minimal svelte-1occ011 translucent');
+
+    for (var i = 0; i < elements.length; i++) {
+        if (elements[i].classList.contains('generating') || !elements[i].classList.contains('hide')) {
+            // Выполнить любое действие здесь
+            console.log('Элемент содержит класс generating');
+            // Например:
+            document.getElementById('component-35').disabled = true
+            setTimeout(() => { document.getElementById('component-35').disabled = false }, 180000);
+        }
+    }
+}
 """
