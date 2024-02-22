@@ -1,10 +1,10 @@
 import re
 import logging
-from __init__ import *
 from datetime import datetime
 from template import create_doc
+from __init__ import LOGGING_DIR
 from logging_custom import FileLogger
-from app import app_celery, LocalChatGPT, LINEBREAK_TOKEN, MODES, BOT_TOKEN, MAX_NEW_TOKENS, SOURCES_SEPARATOR
+from app import LocalChatGPT, LINEBREAK_TOKEN, MODES, BOT_TOKEN, MAX_NEW_TOKENS, SOURCES_SEPARATOR
 
 
 logger = logging.getLogger(__name__)
@@ -15,7 +15,7 @@ class LLM(LocalChatGPT):
     def __init__(self):
         super().__init__()
         self.llama_models = self.initialize_app()
-    
+
     def get_message_generator(self, history, retrieved_docs, mode, top_k, top_p, temp, model_selector):
         model = next((model for model in self.llama_models if model_selector in model.model_path), None)
         tokens = self.get_system_tokens(model)[:]
@@ -32,7 +32,7 @@ class LLM(LocalChatGPT):
             retrieved_docs = re.sub(fr'<a\s+[^>]*>{file}</a>', file, retrieved_docs)
         if retrieved_docs and mode == MODES[1]:
             last_user_message = f"Контекст: {retrieved_docs}\n\nИспользуя только контекст, ответь на вопрос: " \
-                                    f"{last_user_message}"
+                                f"{last_user_message}"
         elif mode == MODES[2]:
             last_user_message = f"{last_user_message}\n\nСегодня {datetime.now().strftime('%d.%m.%Y')} число. " \
                                 f"Если в контексте не указан год, то пиши {datetime.now().year}. " \
@@ -93,7 +93,7 @@ class LLM(LocalChatGPT):
         logger.info("Подготовка к генерации ответа. Формирование полного вопроса на основе контекста и истории")
         if not history or not history[-1][0]:
             return
-        model, generator, files = self.get_message_generator(history, retrieved_docs, collection_radio, top_k, top_p, 
+        model, generator, files = self.get_message_generator(history, retrieved_docs, collection_radio, top_k, top_p,
                                                              temp, model_selector)
         partial_text = ""
         logger.info("Начинается генерация ответа")
@@ -114,23 +114,3 @@ class LLM(LocalChatGPT):
         yield self.get_list_files(
             history, collection_radio, scores, files, partial_text
         )
-
-
-llm_model = None
-
-
-@app_celery.task(bind=True)
-def receive_answer(self, chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector, scores,
-                   message=""):
-
-    global llm_model
-
-    if not llm_model:
-        llm_model = LLM()
-    letters = None
-    chatbot = llm_model.bot(chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector, scores,
-                            message=message)
-    for letters in chatbot:
-        self.update_state(state='PROGRESS', meta={'progress': letters})
-    self.update_state(state='SUCCESS', meta={'result': letters})
-    return letters[-1][1]

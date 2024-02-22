@@ -24,15 +24,15 @@ services:
       CELERY_BROKER_URL: redis://redis
       CELERY_RESULT_BACKEND: redis://redis
     ports:
-      - "7860:7860"
+      - "8000:8000"
     networks:
       - db
 
-  worker:
-    container_name: worker
-    build: ./
+  worker1:
+    container_name: worker1
+    build: .
     restart: always
-    command: celery -A llm worker -l info -E
+    command: celery -A worker.celery worker -l info -E
     volumes:
       - ./scripts:/data
       - ./models:/models  # Монтируйте папку с моделями внутрь контейнера
@@ -45,11 +45,34 @@ services:
       PYTHONPATH: /data
       C_FORCE_ROOT: "yes"
     ports:
-      - "7861:7861"
+      - "7862:7862"
     depends_on:
       - redis
     networks:
       - db
+
+#  worker2:
+#    container_name: worker2
+#    build: .
+#    restart: always
+#    command: celery -A worker.celery worker -l info -E
+#    volumes:
+#      - ./scripts:/data
+#      - ./models:/models  # Монтируйте папку с моделями внутрь контейнера
+#      - ./chroma:/chroma
+#      - ./upload_files:/upload_files
+#      - ./logging/:/logging
+#    environment:
+#      CELERY_BROKER_URL: redis://redis
+#      CELERY_RESULT_BACKEND: redis://redis
+#      PYTHONPATH: /data
+#      C_FORCE_ROOT: "yes"
+#    ports:
+#      - "7863:7863"
+#    depends_on:
+#      - redis
+#    networks:
+#      - db
 
   flower:
     image: mher/flower:0.9.7

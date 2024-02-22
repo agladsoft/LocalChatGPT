@@ -9,10 +9,14 @@ import tempfile
 import pandas as pd
 import gradio as gr
 from re import Pattern
+
+import uvicorn
+
 from __init__ import *
-from celery import Celery
+from fastapi import FastAPI
 from llama_cpp import Llama
 from tinydb import TinyDB, where
+from worker import receive_answer
 from langchain.vectorstores import Chroma
 from typing import List, Optional, Union, Tuple
 from langchain.docstore.document import Document
@@ -21,14 +25,8 @@ from langchain.text_splitter import SpacyTextSplitter
 from langchain.embeddings import HuggingFaceEmbeddings
 
 
+app = FastAPI()
 logger = logging.getLogger(__name__)
-app_celery = Celery(
-    "tasks",
-    broker=os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0'),
-    backend=os.environ.get('CELERY_RESULT_BACKEND', 'redis://localhost:6379/1')
-)
-app_celery.conf.accept_content = ['pickle', 'json', 'msgpack', 'yaml']
-app_celery.conf.worker_send_task_events = True
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 
@@ -217,9 +215,8 @@ class LocalChatGPT:
         else:
             return gr.update(placeholder=self.system_prompt, interactive=False)
 
-    @staticmethod
-    def generate_answer(chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector, scores):
-        from llm import receive_answer
+    @app.post("/tasks", status_code=201)
+    def generate_answer(self, chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector, scores):
         chatbot = receive_answer.delay(chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector,
                                        scores, message=chatbot[-1][0])
         while chatbot.state == 'PENDING':
@@ -635,10 +632,12 @@ class LocalChatGPT:
             # Clear history
             clear.click(lambda: None, None, chatbot, queue=False, js=JS)
 
-        demo.queue(max_size=128, api_open=False)
-        demo.launch(server_name="0.0.0.0")
+        demo.queue(max_size=128, api_open=False, default_concurrency_limit=2)
+        return demo
 
 
 if __name__ == "__main__":
     local_chat_gpt = LocalChatGPT()
-    local_chat_gpt.run()
+    demo = local_chat_gpt.run()
+    gr.mount_gradio_app(app, demo, path="/")
+    uvicorn.run(app, host="0.0.0.0", port="8000", log_config=None)

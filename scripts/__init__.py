@@ -22,7 +22,7 @@ QUERY_SYSTEM_PROMPT: str = "Вы, Макар - полезный, уважите�
 LLM_SYSTEM_PROMPT: str = "Вы, Макар - полезный, уважительный и честный ассистент."
 
 MODES: list = ["ВНД", "Свободное общение", "Получение документов"]
-CONTEXT_SIZE = 4000
+CONTEXT_SIZE = 500
 SYSTEM_TOKEN: int = 1788
 USER_TOKEN: int = 1404
 BOT_TOKEN: int = 9225
@@ -56,7 +56,7 @@ DICT_REPO_AND_MODELS: dict = {
 }
 
 
-EMBEDDER_NAME: str = "intfloat/multilingual-e5-large"
+EMBEDDER_NAME: str = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
 
 MAX_NEW_TOKENS: int = 1500
 
