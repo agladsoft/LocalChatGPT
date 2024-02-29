@@ -699,6 +699,9 @@ class LocalChatGPT:
 
             # Upload files
             upload_button.upload(
+                fn=self.load_model,
+                inputs=[gr.State(False)]
+            ).success(
                 fn=self.upload_files,
                 inputs=[upload_button],
                 outputs=[file_paths],
@@ -711,7 +714,10 @@ class LocalChatGPT:
             ).success(
                 self.ingest_files,
                 outputs=ingested_dataset
-            ).success()
+            ).success(
+                fn=self.load_model,
+                inputs=[gr.State(True)]
+            )
 
             # Delete documents from db
             delete.click(
