@@ -1,88 +1,23 @@
 version: '3.9'
 services:
-  redis:
-    image: redis:latest
-    container_name: redis
-    restart: always
-    ports:
-      - "6379:6379"
-    networks:
-      - db
-
   chatbot:
     container_name: chatbot
     build: .
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu ]
     restart: always
-    command: python3 -u app.py
     volumes:
       - ./models:/models  # Монтируйте папку с моделями внутрь контейнера
       - ./chroma:/chroma
       - ./upload_files:/upload_files
       - ./scripts:/app
-      - ./logging/:/logging
-    environment:
-      CELERY_BROKER_URL: redis://redis
-      CELERY_RESULT_BACKEND: redis://redis
     ports:
-      - "8000:8000"
-    networks:
-      - db
-
-  worker1:
-    container_name: worker1
-    build: .
-    restart: always
-    command: celery -A worker.celery worker -l info -E
-    volumes:
-      - ./scripts:/data
-      - ./models:/models  # Монтируйте папку с моделями внутрь контейнера
-      - ./chroma:/chroma
-      - ./upload_files:/upload_files
-      - ./logging/:/logging
-    environment:
-      CELERY_BROKER_URL: redis://redis
-      CELERY_RESULT_BACKEND: redis://redis
-      PYTHONPATH: /data
-      C_FORCE_ROOT: "yes"
-    ports:
-      - "7862:7862"
-    depends_on:
-      - redis
-    networks:
-      - db
-
-#  worker2:
-#    container_name: worker2
-#    build: .
-#    restart: always
-#    command: celery -A worker.celery worker -l info -E
-#    volumes:
-#      - ./scripts:/data
-#      - ./models:/models  # Монтируйте папку с моделями внутрь контейнера
-#      - ./chroma:/chroma
-#      - ./upload_files:/upload_files
-#      - ./logging/:/logging
-#    environment:
-#      CELERY_BROKER_URL: redis://redis
-#      CELERY_RESULT_BACKEND: redis://redis
-#      PYTHONPATH: /data
-#      C_FORCE_ROOT: "yes"
-#    ports:
-#      - "7863:7863"
-#    depends_on:
-#      - redis
-#    networks:
-#      - db
-
-  flower:
-    image: mher/flower:0.9.7
-    container_name: flower
-    command: [ 'flower', '--broker=redis://redis', '--port=5555' ]
-    restart: always
-    ports:
-      - "5555:5555"
-    depends_on:
-      - redis
+      - "8001:8001"
     networks:
       - db
 

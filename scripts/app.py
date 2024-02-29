@@ -1,22 +1,20 @@
 import re
 import csv
-import time
+import uvicorn
 import os.path
 import logging
 import chromadb
-import datetime
 import tempfile
 import pandas as pd
 import gradio as gr
 from re import Pattern
-
-import uvicorn
-
 from __init__ import *
 from fastapi import FastAPI
 from llama_cpp import Llama
+from datetime import datetime
+from template import create_doc
 from tinydb import TinyDB, where
-from worker import receive_answer
+from logging_custom import FileLogger
 from langchain.vectorstores import Chroma
 from typing import List, Optional, Union, Tuple
 from langchain.docstore.document import Document
@@ -27,6 +25,7 @@ from langchain.embeddings import HuggingFaceEmbeddings
 
 app = FastAPI()
 logger = logging.getLogger(__name__)
+f_logger = FileLogger(__name__, f"{LOGGING_DIR}/answers_bot.log", mode='a', level=logging.INFO)
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 
@@ -215,17 +214,103 @@ class LocalChatGPT:
         else:
             return gr.update(placeholder=self.system_prompt, interactive=False)
 
-    @app.post("/tasks", status_code=201)
-    def generate_answer(self, chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector, scores):
-        chatbot = receive_answer.delay(chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector,
-                                       scores, message=chatbot[-1][0])
-        while chatbot.state == 'PENDING':
-            pass
-        while chatbot.state == 'PROGRESS':
-            yield chatbot.info.get('progress')
-            time.sleep(0.1)
-        print(f"Status is {chatbot.state}")
-        yield chatbot.info.get('result')
+    def get_message_generator(self, history, retrieved_docs, mode, top_k, top_p, temp, model_selector):
+        model = next((model for model in self.llama_models if model_selector in model.model_path), None)
+        tokens = self.get_system_tokens(model)[:]
+        tokens.append(LINEBREAK_TOKEN)
+
+        for user_message, bot_message in history[-4:-1]:
+            message_tokens = self.get_message_tokens(model=model, role="user", content=user_message)
+            tokens.extend(message_tokens)
+
+        last_user_message = history[-1][0]
+        pattern = r'<a\s+[^>]*>(.*?)</a>'
+        files = re.findall(pattern, retrieved_docs)
+        for file in files:
+            retrieved_docs = re.sub(fr'<a\s+[^>]*>{file}</a>', file, retrieved_docs)
+        if retrieved_docs and mode == MODES[1]:
+            last_user_message = f"Контекст: {retrieved_docs}\n\nИспользуя только контекст, ответь на вопрос: " \
+                                f"{last_user_message}"
+        elif mode == MODES[2]:
+            last_user_message = f"{last_user_message}\n\nСегодня {datetime.now().strftime('%d.%m.%Y')} число. " \
+                                f"Если в контексте не указан год, то пиши {datetime.now().year}. " \
+                                f"Напиши ответ только так, без каких либо дополнений: " \
+                                f"Прошу предоставить ежегодный оплачиваемый отпуск " \
+                                f"с (дата начала отпуска в формате DD.MM.YYYY) " \
+                                f"по (дата окончания отпуска в формате DD.MM.YYYY)."
+        message_tokens = self.get_message_tokens(model=model, role="user", content=last_user_message)
+        tokens.extend(message_tokens)
+        f_logger.finfo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] - Вопрос: {history[-1][0]} - "
+                       f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}]\n")
+
+        role_tokens = [model.token_bos(), BOT_TOKEN, LINEBREAK_TOKEN]
+        tokens.extend(role_tokens)
+        generator = model.generate(
+            tokens,
+            top_k=top_k,
+            top_p=top_p,
+            temp=temp
+        )
+        return model, generator, files
+
+    @staticmethod
+    def get_list_files(history, mode, scores, files, partial_text):
+        if files:
+            partial_text += SOURCES_SEPARATOR
+            sources_text = [
+                f"{index}. {source}"
+                for index, source in enumerate(files, start=1)
+            ]
+            threshold = 0.44
+            if scores and scores[0] < threshold:
+                partial_text += "\n\n\n".join(sources_text)
+            elif scores:
+                partial_text += sources_text[0]
+            history[-1][1] = partial_text
+        elif mode == MODES[2]:
+            file = create_doc(partial_text, "Титова", "Сергея Сергеевича", "Руководитель отдела",
+                              "Отдел организационного развития")
+            partial_text += f'\n\n\nФайл: {file}'
+            history[-1][1] = partial_text
+        return history
+
+    def bot(self, history, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector, scores):
+        """
+
+        :param history:
+        :param collection_radio:
+        :param retrieved_docs:
+        :param top_p:
+        :param top_k:
+        :param temp:
+        :param model_selector:
+        :param scores:
+        :return:
+        """
+        logger.info("Подготовка к генерации ответа. Формирование полного вопроса на основе контекста и истории")
+        if not history or not history[-1][0]:
+            return
+        model, generator, files = self.get_message_generator(history, retrieved_docs, collection_radio, top_k, top_p,
+                                                             temp, model_selector)
+        partial_text = ""
+        logger.info("Начинается генерация ответа")
+        f_logger.finfo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] - Ответ: ")
+        try:
+            for i, token in enumerate(generator):
+                if token == model.token_eos() or (MAX_NEW_TOKENS is not None and i >= MAX_NEW_TOKENS):
+                    break
+                letters = model.detokenize([token]).decode("utf-8", "ignore")
+                partial_text += letters
+                f_logger.finfo(letters)
+                history[-1][1] = partial_text
+                yield history
+        except Exception as ex:
+            logger.error(f"Error - {ex}")
+        f_logger.finfo(f" - [{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}]\n\n")
+        logger.info("Генерация ответа закончена")
+        yield self.get_list_files(
+            history, collection_radio, scores, files, partial_text
+        )
 
     @staticmethod
     def user(message, history):
@@ -313,7 +398,7 @@ class LocalChatGPT:
                     {
                         'Ответы': answer,
                         'Количество повторений': result[0]['Количество повторений'] + 1,
-                        'Старт обработки запроса': str(datetime.datetime.now())
+                        'Старт обработки запроса': str(datetime.now())
                     },
                     cond=filter_query
                 )
@@ -323,7 +408,7 @@ class LocalChatGPT:
         elif message is not None:
             self.tiny_db.insert(
                 {'Сообщения': message, 'Ответы': answer, 'Количество повторений': 1, 'Оценка ответа': None,
-                 'Старт обработки запроса': str(datetime.datetime.now())}
+                 'Старт обработки запроса': str(datetime.now())}
             )
         return self.get_analytics()
 
@@ -589,7 +674,7 @@ class LocalChatGPT:
                 outputs=[retrieved_docs, scores],
                 queue=True,
             ).success(
-                fn=self.generate_answer,
+                fn=self.bot,
                 inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector, scores],
                 outputs=chatbot,
                 queue=True
@@ -607,7 +692,7 @@ class LocalChatGPT:
                 outputs=[retrieved_docs, scores],
                 queue=True,
             ).success(
-                fn=self.generate_answer,
+                fn=self.bot,
                 inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector, scores],
                 outputs=chatbot,
                 queue=True
@@ -632,7 +717,7 @@ class LocalChatGPT:
             # Clear history
             clear.click(lambda: None, None, chatbot, queue=False, js=JS)
 
-        demo.queue(max_size=128, api_open=False, default_concurrency_limit=2)
+        demo.queue(max_size=128, api_open=False)
         return demo
 
 
@@ -640,4 +725,4 @@ if __name__ == "__main__":
     local_chat_gpt = LocalChatGPT()
     demo = local_chat_gpt.run()
     gr.mount_gradio_app(app, demo, path="/")
-    uvicorn.run(app, host="0.0.0.0", port="8000", log_config=None)
+    uvicorn.run(app, host="0.0.0.0", port="8001")

@@ -6,7 +6,7 @@ class SingleLineLogHandler(RotatingFileHandler):
     def emit(self, record):
         msg = self.format(record)
         if self.stream is not None:
-            self.stream.write(msg + '')
+            self.stream.write(f'{msg}')
             self.stream.flush()
 
 
@@ -68,8 +68,7 @@ class FileLogger(logging.Logger):
 if __name__ == '__main__':
     log_format = '%(message)s'
     logging.basicConfig(format=log_format, level=logging.CRITICAL, datefmt="%H:%M:%S")
-    fLogger = FileLogger(__name__, f'tmp.log', mode='a', level=logging.INFO)
-
+    fLogger = FileLogger(__name__, 'tmp.log', mode='a', level=logging.INFO)
     fLogger.finfo("le")
     fLogger.finfo("vel")
 
