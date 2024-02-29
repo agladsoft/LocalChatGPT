@@ -34,7 +34,7 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 class LocalChatGPT:
 
     def __init__(self):
-        self.llama_models: Optional[Llama] = self.initialize_app()
+        self.llama_model: Optional[Llama] = self.initialize_app()
         self.embeddings = HuggingFaceEmbeddings(model_name=EMBEDDER_NAME, cache_folder=MODELS_DIR)
         self.db: Optional[Chroma] = None
         self.collection: str = "all-documents"
@@ -45,29 +45,39 @@ class LocalChatGPT:
         self.tiny_db = TinyDB(f'{DATA_QUESTIONS}/tiny_db.json', indent=4, ensure_ascii=False)
 
     @staticmethod
-    def initialize_app() -> List[Llama]:
+    def initialize_app() -> Llama:
         """
         Загружаем все модели из списка.
         :return:
         """
-        llama_models: list = []
         os.makedirs(MODELS_DIR, exist_ok=True)
-        for model_url, model_name in list(DICT_REPO_AND_MODELS.items()):
-            final_model_path = os.path.join(MODELS_DIR, model_name)
-            os.makedirs(os.path.dirname(final_model_path), exist_ok=True)
+        final_model_path = os.path.join(MODELS_DIR, MODEL_NAME)
+        os.makedirs(os.path.dirname(final_model_path), exist_ok=True)
 
-            if not os.path.exists(final_model_path):
-                with open(final_model_path, "wb") as f:
-                    http_get(model_url, f)
+        if not os.path.exists(final_model_path):
+            with open(final_model_path, "wb") as f:
+                http_get(REPO, f)
 
-            llama_models.append(Llama(
-                n_gpu_layers=43,
-                model_path=final_model_path,
-                n_ctx=CONTEXT_SIZE,
-                n_parts=1,
-            ))
+        return Llama(
+            n_gpu_layers=43,
+            model_path=final_model_path,
+            n_ctx=CONTEXT_SIZE,
+            n_parts=1,
+        )
 
-        return llama_models
+    def load_model(self, is_load_model: bool):
+        """
+
+        :return:
+        """
+        if is_load_model:
+            self.llama_model = self.initialize_app()
+            gr.Info("Модель загружена, можете задавать вопросы")
+        else:
+            self.llama_model.reset()
+            self.llama_model.set_cache(None)
+            del self.llama_model
+            self.llama_model = None
 
     @staticmethod
     def load_single_document(file_path: str) -> Document:
@@ -243,8 +253,8 @@ class LocalChatGPT:
                 history[-1][1] = partial_text
             return self.calculate_end_date(history)
 
-    def get_message_generator(self, history, retrieved_docs, mode, top_k, top_p, temp, model_selector):
-        model = next((model for model in self.llama_models if model_selector in model.model_path), None)
+    def get_message_generator(self, history, retrieved_docs, mode, top_k, top_p, temp):
+        model = self.llama_model
         tokens = self.get_system_tokens(model)[:]
         tokens.append(LINEBREAK_TOKEN)
 
@@ -303,7 +313,7 @@ class LocalChatGPT:
             history[-1][1] = partial_text
         return history
 
-    def bot(self, history, mode, retrieved_docs, top_p, top_k, temp, model_selector, scores, uid):
+    def bot(self, history, mode, retrieved_docs, top_p, top_k, temp, scores, uid):
         """
 
         :param history:
@@ -312,7 +322,6 @@ class LocalChatGPT:
         :param top_p:
         :param top_k:
         :param temp:
-        :param model_selector:
         :param scores:
         :param uid:
         :return:
@@ -324,8 +333,7 @@ class LocalChatGPT:
             yield history[:-1]
             self.semaphore.release()
             return
-        model, generator, files = self.get_message_generator(history, retrieved_docs, mode, top_k, top_p,
-                                                             temp, model_selector)
+        model, generator, files = self.get_message_generator(history, retrieved_docs, mode, top_k, top_p, temp)
         partial_text = ""
         logger.info(f"Начинается генерация ответа [uid - {uid}]")
         f_logger.finfo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] - Ответ: ")
@@ -596,10 +604,9 @@ class LocalChatGPT:
 
             with gr.Tab("Настройки"):
                 with gr.Row(elem_id="model_selector_row"):
-                    models: list = list(DICT_REPO_AND_MODELS.values())
-                    model_selector = gr.Dropdown(
-                        choices=models,
-                        value=models[0] if models else "",
+                    gr.Dropdown(
+                        choices=list(MODEL_NAME),
+                        value=MODEL_NAME,
                         interactive=True,
                         show_label=False,
                         container=False,
@@ -704,7 +711,7 @@ class LocalChatGPT:
             ).success(
                 self.ingest_files,
                 outputs=ingested_dataset
-            )
+            ).success()
 
             # Delete documents from db
             delete.click(
@@ -726,7 +733,7 @@ class LocalChatGPT:
                 queue=True,
             ).success(
                 fn=self.bot,
-                inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector, scores, uid],
+                inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, scores, uid],
                 outputs=chatbot,
                 queue=True
             )
@@ -744,7 +751,7 @@ class LocalChatGPT:
                 queue=True,
             ).success(
                 fn=self.bot,
-                inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector, scores, uid],
+                inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, scores, uid],
                 outputs=chatbot,
                 queue=True
             )

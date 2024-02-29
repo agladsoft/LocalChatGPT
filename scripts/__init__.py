@@ -49,14 +49,11 @@ LOADER_MAPPING: dict = {
     ".txt": (TextLoader, {"encoding": "utf8"}),
 }
 
-REPO: str = "saiga2_13b_gguf"
-MODEL: str = "model-q4_K.gguf"
+MODEL: str = "saiga2_13b_gguf"
+MODEL_Q: str = "model-q4_K.gguf"
 
-
-DICT_REPO_AND_MODELS: dict = {
-    f"https://huggingface.co/IlyaGusev/{REPO}/resolve/main/{MODEL}":
-        f"{REPO}/{MODEL}",
-}
+REPO: str = f"https://huggingface.co/IlyaGusev/{MODEL}/resolve/main/{MODEL_Q}"
+MODEL_NAME = f"{MODEL}/{MODEL_Q}"
 
 
 EMBEDDER_NAME: str = "intfloat/multilingual-e5-large"
