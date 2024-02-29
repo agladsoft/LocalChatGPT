@@ -392,7 +392,6 @@ class LocalChatGPT:
         if not self.db or collection_radio != MODES[0] or not history or not history[-1][0]:
             return "Появятся после задавания вопросов", []
         last_user_message = history[-1][0]
-        print(last_user_message, k_documents)
         docs = self.db.similarity_search_with_score(last_user_message, k_documents)
         scores: list = []
         data: dict = {}
