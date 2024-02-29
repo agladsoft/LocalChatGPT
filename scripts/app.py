@@ -357,6 +357,7 @@ class LocalChatGPT:
     def user(self, message, history):
         uid = uuid.uuid4()
         logger.info(f"Обработка вопроса. Очередь - {self._queue}. UID - [{uid}]")
+        self.semaphore.acquire()
         if history is None:
             history = []
         new_history = history + [[message, None]]
@@ -365,14 +366,19 @@ class LocalChatGPT:
         logger.info(f"Закончена обработка вопроса. UID - [{uid}]")
         return "", new_history, uid
 
-    @staticmethod
-    def regenerate_response(history):
+    def regenerate_response(self, history):
         """
 
         :param history:
         :return:
         """
-        return "", history
+        uid = uuid.uuid4()
+        logger.info(f"Обработка вопроса. Очередь - {self._queue}. UID - [{uid}]")
+        self.semaphore.acquire()
+        self._queue += 1
+        self.semaphore.release()
+        logger.info(f"Закончена обработка вопроса. UID - [{uid}]")
+        return "", history, uid
 
     def retrieve(self, history, collection_radio, k_documents: int, uid: str) -> Tuple[str, list]:
         """
