@@ -1,5 +1,6 @@
 import re
 import csv
+import time
 import uuid
 import uvicorn
 import os.path
@@ -71,6 +72,7 @@ class LocalChatGPT:
         :return:
         """
         if is_load_model:
+            time.sleep(15)
             self.llama_model = self.initialize_app()
             gr.Info("Модель загружена, можете задавать вопросы")
         else:
