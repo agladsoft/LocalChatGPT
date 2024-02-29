@@ -22,7 +22,7 @@ QUERY_SYSTEM_PROMPT: str = "Вы, Макар - полезный, уважите�
 LLM_SYSTEM_PROMPT: str = "Вы, Макар - полезный, уважительный и честный ассистент."
 
 MODES: list = ["ВНД", "Свободное общение", "Получение документов"]
-CONTEXT_SIZE = 500
+CONTEXT_SIZE = 4000
 SYSTEM_TOKEN: int = 1788
 USER_TOKEN: int = 1404
 BOT_TOKEN: int = 9225
@@ -49,14 +49,17 @@ LOADER_MAPPING: dict = {
     ".txt": (TextLoader, {"encoding": "utf8"}),
 }
 
+REPO: str = "saiga2_13b_gguf"
+MODEL: str = "model-q4_K.gguf"
+
 
 DICT_REPO_AND_MODELS: dict = {
-    "https://huggingface.co/IlyaGusev/saiga2_7b_gguf/resolve/main/model-q3_K.gguf":
-        "saiga2_7b_gguf/model-q3_K.gguf",
+    f"https://huggingface.co/IlyaGusev/{REPO}/resolve/main/{MODEL}":
+        f"{REPO}/{MODEL}",
 }
 
 
-EMBEDDER_NAME: str = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+EMBEDDER_NAME: str = "intfloat/multilingual-e5-large"
 
 MAX_NEW_TOKENS: int = 1500
 

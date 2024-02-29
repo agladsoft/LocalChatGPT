@@ -1,20 +1,22 @@
 import re
 import csv
+import uuid
 import uvicorn
 import os.path
 import logging
 import chromadb
 import tempfile
+import threading
 import pandas as pd
 import gradio as gr
 from re import Pattern
 from __init__ import *
 from fastapi import FastAPI
 from llama_cpp import Llama
-from datetime import datetime
 from template import create_doc
 from tinydb import TinyDB, where
 from logging_custom import FileLogger
+from datetime import datetime, timedelta
 from langchain.vectorstores import Chroma
 from typing import List, Optional, Union, Tuple
 from langchain.docstore.document import Document
@@ -32,13 +34,14 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 class LocalChatGPT:
 
     def __init__(self):
-        self.llama_models = None
+        self.llama_models: Optional[Llama] = self.initialize_app()
         self.embeddings = HuggingFaceEmbeddings(model_name=EMBEDDER_NAME, cache_folder=MODELS_DIR)
         self.db: Optional[Chroma] = None
-        self.llama_model: Optional[Llama] = None
         self.collection: str = "all-documents"
         self.mode: str = MODES[0]
         self.system_prompt = self._get_default_system_prompt(self.mode)
+        self.semaphore = threading.Semaphore()
+        self._queue = 0
         self.tiny_db = TinyDB(f'{DATA_QUESTIONS}/tiny_db.json', indent=4, ensure_ascii=False)
 
     @staticmethod
@@ -214,6 +217,32 @@ class LocalChatGPT:
         else:
             return gr.update(placeholder=self.system_prompt, interactive=False)
 
+    @staticmethod
+    def calculate_end_date(history):
+        long_days = re.findall(r"\d{1,4} д", history[-1][0])
+        list_dates = []
+        for day in long_days:
+            day = int(day.replace(" д", ""))
+            start_dates = re.findall(r"\d{1,2}[.]\d{1,2}[.]\d{2,4}", history[-1][1])
+            for date in start_dates:
+                list_dates.append(date)
+                end_date = datetime.strptime(date, '%d.%m.%Y') + timedelta(days=day)
+                end_date = end_date.strftime('%d.%m.%Y')
+                list_dates.append(end_date)
+                return [[f"Начало отпуска - {list_dates[0]}. Конец отпуска - {list_dates[1]}", None]]
+
+    def get_dates_in_question(self, history, model, generator, mode):
+        if mode == MODES[2]:
+            partial_text = ""
+            for i, token in enumerate(generator):
+                if token == model.token_eos() or (MAX_NEW_TOKENS is not None and i >= MAX_NEW_TOKENS):
+                    break
+                letters = model.detokenize([token]).decode("utf-8", "ignore")
+                partial_text += letters
+                f_logger.finfo(letters)
+                history[-1][1] = partial_text
+            return self.calculate_end_date(history)
+
     def get_message_generator(self, history, retrieved_docs, mode, top_k, top_p, temp, model_selector):
         model = next((model for model in self.llama_models if model_selector in model.model_path), None)
         tokens = self.get_system_tokens(model)[:]
@@ -274,27 +303,36 @@ class LocalChatGPT:
             history[-1][1] = partial_text
         return history
 
-    def bot(self, history, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector, scores):
+    def bot(self, history, mode, retrieved_docs, top_p, top_k, temp, model_selector, scores, uid):
         """
 
         :param history:
-        :param collection_radio:
+        :param mode:
         :param retrieved_docs:
         :param top_p:
         :param top_k:
         :param temp:
         :param model_selector:
         :param scores:
+        :param uid:
         :return:
         """
-        logger.info("Подготовка к генерации ответа. Формирование полного вопроса на основе контекста и истории")
+        logger.info(f"Подготовка к генерации ответа. Формирование полного вопроса на основе контекста и истории "
+                    f"[uid - {uid}]")
+        self.semaphore.acquire()
         if not history or not history[-1][0]:
+            yield history[:-1]
+            self.semaphore.release()
             return
-        model, generator, files = self.get_message_generator(history, retrieved_docs, collection_radio, top_k, top_p,
+        model, generator, files = self.get_message_generator(history, retrieved_docs, mode, top_k, top_p,
                                                              temp, model_selector)
         partial_text = ""
-        logger.info("Начинается генерация ответа")
+        logger.info(f"Начинается генерация ответа [uid - {uid}]")
         f_logger.finfo(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] - Ответ: ")
+        if message := self.get_dates_in_question(history, model, generator, mode):
+            model, generator, files = self.get_message_generator(message, retrieved_docs, mode, top_k, top_p, temp, uid)
+        elif mode == MODES[2]:
+            model, generator, files = self.get_message_generator(history, retrieved_docs, mode, top_k, top_p, temp, uid)
         try:
             for i, token in enumerate(generator):
                 if token == model.token_eos() or (MAX_NEW_TOKENS is not None and i >= MAX_NEW_TOKENS):
@@ -306,20 +344,26 @@ class LocalChatGPT:
                 yield history
         except Exception as ex:
             logger.error(f"Error - {ex}")
+            partial_text += "\nСлишком большой контекст. " \
+                            "Попробуйте уменьшить его или измените количество выдаваемого контекста в настройках"
+            history[-1][1] = partial_text
+            yield history
         f_logger.finfo(f" - [{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}]\n\n")
-        logger.info("Генерация ответа закончена")
-        yield self.get_list_files(
-            history, collection_radio, scores, files, partial_text
-        )
+        logger.info(f"Генерация ответа закончена [uid - {uid}]")
+        yield self.get_list_files(history, mode, scores, files, partial_text)
+        self._queue -= 1
+        self.semaphore.release()
 
-    @staticmethod
-    def user(message, history):
-        logger.info("Обработка вопроса")
+    def user(self, message, history):
+        uid = uuid.uuid4()
+        logger.info(f"Обработка вопроса. Очередь - {self._queue}. UID - [{uid}]")
         if history is None:
             history = []
         new_history = history + [[message, None]]
-        logger.info("Закончена обработка вопроса")
-        return "", new_history
+        self._queue += 1
+        self.semaphore.release()
+        logger.info(f"Закончена обработка вопроса. UID - [{uid}]")
+        return "", new_history, uid
 
     @staticmethod
     def regenerate_response(history):
@@ -330,7 +374,7 @@ class LocalChatGPT:
         """
         return "", history
 
-    def retrieve(self, history, collection_radio, k_documents: int) -> Tuple[str, list]:
+    def retrieve(self, history, collection_radio, k_documents: int, uid: str) -> Tuple[str, list]:
         """
 
         :param history:
@@ -356,7 +400,7 @@ class LocalChatGPT:
             else:
                 data[document] = f"Score: {score}, Text: {doc[0].page_content}"
         list_data: list = [f"{doc}\n\n{text}" for doc, text in data.items()]
-        logger.info("Получили контекст из базы")
+        logger.info(f"Получили контекст из базы [uid - {uid}]")
         if not list_data:
             return "Документов в базе нету", scores
         return "\n\n\n".join(list_data), scores
@@ -469,6 +513,7 @@ class LocalChatGPT:
             gr.Markdown(
                 f"""<h1><center>{favicon} Я, Макар - виртуальный ассистент Рускон</center></h1>"""
             )
+            uid = gr.State(None)
             scores = gr.State(None)
 
             with gr.Tab("Чат"):
@@ -666,16 +711,16 @@ class LocalChatGPT:
             msg.submit(
                 fn=self.user,
                 inputs=[msg, chatbot],
-                outputs=[msg, chatbot],
+                outputs=[msg, chatbot, uid],
                 queue=False,
             ).success(
                 fn=self.retrieve,
-                inputs=[chatbot, collection_radio, k_documents],
+                inputs=[chatbot, collection_radio, k_documents, uid],
                 outputs=[retrieved_docs, scores],
                 queue=True,
             ).success(
                 fn=self.bot,
-                inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector, scores],
+                inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector, scores, uid],
                 outputs=chatbot,
                 queue=True
             )
@@ -684,16 +729,16 @@ class LocalChatGPT:
             submit.click(
                 fn=self.user,
                 inputs=[msg, chatbot],
-                outputs=[msg, chatbot],
+                outputs=[msg, chatbot, uid],
                 queue=False,
             ).success(
                 fn=self.retrieve,
-                inputs=[chatbot, collection_radio, k_documents],
+                inputs=[chatbot, collection_radio, k_documents, uid],
                 outputs=[retrieved_docs, scores],
                 queue=True,
             ).success(
                 fn=self.bot,
-                inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector, scores],
+                inputs=[chatbot, collection_radio, retrieved_docs, top_p, top_k, temp, model_selector, scores, uid],
                 outputs=chatbot,
                 queue=True
             )
@@ -725,4 +770,4 @@ if __name__ == "__main__":
     local_chat_gpt = LocalChatGPT()
     demo = local_chat_gpt.run()
     gr.mount_gradio_app(app, demo, path="/")
-    uvicorn.run(app, host="0.0.0.0", port="8001")
+    uvicorn.run(app, host="0.0.0.0", port=8001)

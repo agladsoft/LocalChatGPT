@@ -17,7 +17,7 @@ services:
       - ./upload_files:/upload_files
       - ./scripts:/app
     ports:
-      - "8001:8001"
+      - "8001:8080"
     networks:
       - db
 
