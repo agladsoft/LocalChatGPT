@@ -380,6 +380,7 @@ class LocalChatGPT:
         :param history:
         :param collection_radio:
         :param k_documents:
+        :param uid:
         :return:
         """
         if not self.db or collection_radio != MODES[0] or not history or not history[-1][0]:
@@ -768,6 +769,6 @@ class LocalChatGPT:
 
 if __name__ == "__main__":
     local_chat_gpt = LocalChatGPT()
-    demo = local_chat_gpt.run()
-    gr.mount_gradio_app(app, demo, path="/")
+    blocks = local_chat_gpt.run()
+    gr.mount_gradio_app(app, blocks, path="/")
     uvicorn.run(app, host="0.0.0.0", port=8001)
