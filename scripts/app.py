@@ -21,8 +21,8 @@ from langchain.vectorstores import Chroma
 from typing import List, Optional, Union, Tuple
 from langchain.docstore.document import Document
 from huggingface_hub.file_download import http_get
-from langchain.text_splitter import SpacyTextSplitter
 from langchain.embeddings import HuggingFaceEmbeddings
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 
 app = FastAPI()
@@ -171,8 +171,8 @@ class LocalChatGPT:
         :return:
         """
         load_documents: List[Document] = [self.load_single_document(path) for path in file_paths]
-        text_splitter: SpacyTextSplitter = SpacyTextSplitter(
-            pipeline="ru_core_news_md", chunk_size=chunk_size, chunk_overlap=chunk_overlap
+        text_splitter: RecursiveCharacterTextSplitter = RecursiveCharacterTextSplitter(
+            chunk_size=chunk_size, chunk_overlap=chunk_overlap
         )
         documents = text_splitter.split_documents(load_documents)
         fixed_documents: List[Document] = []
