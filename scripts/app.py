@@ -84,9 +84,8 @@ class LocalChatGPT:
             self.embeddings = HuggingFaceEmbeddings(model_name=EMBEDDER_NAME, cache_folder=MODELS_DIR)
             self.load_db()
 
-            time.sleep(20)
-
             logger.info("Init model")
+            time.sleep(20)
 
             self.llama_model = self.initialize_app()
             gr.Info("Модель загружена, можете задавать вопросы")
