@@ -30,6 +30,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 app = FastAPI()
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 f_logger = FileLogger(__name__, f"{LOGGING_DIR}/answers_bot.log", mode='a', level=logging.INFO)
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
@@ -74,7 +75,7 @@ class LocalChatGPT:
         :return:
         """
         if is_load_model:
-            f_logger.info("Clear db and embedding")
+            logger.info("Clear db and embedding")
             time.sleep(20)
             del self.embeddings
             del self.db
@@ -87,12 +88,12 @@ class LocalChatGPT:
 
             time.sleep(20)
 
-            f_logger.info("Init model")
+            logger.info("Init model")
 
             self.llama_model = self.initialize_app()
             gr.Info("Модель загружена, можете задавать вопросы")
         else:
-            f_logger.info("Clear model")
+            logger.info("Clear model")
             self.llama_model.reset()
             self.llama_model.set_cache(None)
             del self.llama_model
