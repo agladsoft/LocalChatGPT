@@ -72,12 +72,13 @@ class LocalChatGPT:
         :return:
         """
         if is_load_model:
-            time.sleep(15)
+            time.sleep(20)
             del self.embeddings
             del self.db
 
             self.embeddings = HuggingFaceEmbeddings(model_name=EMBEDDER_NAME, cache_folder=MODELS_DIR)
             self.load_db()
+
             self.llama_model = self.initialize_app()
             gr.Info("Модель загружена, можете задавать вопросы")
         else:
