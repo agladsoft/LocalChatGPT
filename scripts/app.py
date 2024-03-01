@@ -72,6 +72,7 @@ class LocalChatGPT:
         :return:
         """
         if is_load_model:
+            logger.info("Clear db and embedding")
             time.sleep(20)
             del self.embeddings
             del self.db
@@ -79,9 +80,14 @@ class LocalChatGPT:
             self.embeddings = HuggingFaceEmbeddings(model_name=EMBEDDER_NAME, cache_folder=MODELS_DIR)
             self.load_db()
 
+            time.sleep(20)
+
+            logger.info("Init model")
+
             self.llama_model = self.initialize_app()
             gr.Info("Модель загружена, можете задавать вопросы")
         else:
+            logger.info("Clear model")
             self.llama_model.reset()
             self.llama_model.set_cache(None)
             del self.llama_model
