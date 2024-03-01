@@ -1,4 +1,5 @@
 import os
+import logging
 from langchain.document_loaders import (
     CSVLoader,
     EverNoteLoader,
@@ -122,3 +123,23 @@ function disable_btn() {
     }
 }
 """
+
+
+LOG_FORMAT: str = "[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s"
+DATE_FTM: str = "%d/%B/%Y %H:%M:%S"
+
+
+def get_stream_handler():
+    stream_handler: logging.StreamHandler = logging.StreamHandler()
+    stream_handler.setLevel(logging.INFO)
+    stream_handler.setFormatter(logging.Formatter(LOG_FORMAT))
+    return stream_handler
+
+
+def get_logger(name: str) -> logging.getLogger:
+    logger: logging.getLogger = logging.getLogger(name)
+    if logger.hasHandlers():
+        logger.handlers.clear()
+    logger.addHandler(get_stream_handler())
+    logger.setLevel(logging.INFO)
+    return logger

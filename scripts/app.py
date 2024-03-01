@@ -6,7 +6,6 @@ import uuid
 import torch
 import uvicorn
 import os.path
-import logging
 import chromadb
 import tempfile
 import threading
@@ -29,8 +28,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 
 app = FastAPI()
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger = get_logger(os.path.basename(__file__).replace(".py", "_") + str(datetime.now().date()))
 f_logger = FileLogger(__name__, f"{LOGGING_DIR}/answers_bot.log", mode='a', level=logging.INFO)
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
