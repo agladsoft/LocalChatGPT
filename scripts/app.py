@@ -74,7 +74,7 @@ class LocalChatGPT:
         :return:
         """
         if is_load_model:
-            logger.info("Clear db and embedding")
+            f_logger.info("Clear db and embedding")
             time.sleep(20)
             del self.embeddings
             del self.db
@@ -87,12 +87,12 @@ class LocalChatGPT:
 
             time.sleep(20)
 
-            logger.info("Init model")
+            f_logger.info("Init model")
 
             self.llama_model = self.initialize_app()
             gr.Info("Модель загружена, можете задавать вопросы")
         else:
-            logger.info("Clear model")
+            f_logger.info("Clear model")
             self.llama_model.reset()
             self.llama_model.set_cache(None)
             del self.llama_model
