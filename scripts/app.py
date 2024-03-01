@@ -77,6 +77,9 @@ class LocalChatGPT:
             del self.embeddings
             del self.db
 
+            self.embeddings.cuda()
+            self.db.cuda()
+
             self.embeddings = HuggingFaceEmbeddings(model_name=EMBEDDER_NAME, cache_folder=MODELS_DIR)
             self.load_db()
 
