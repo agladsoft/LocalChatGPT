@@ -75,6 +75,7 @@ class LocalChatGPT:
         if is_load_model:
             logger.info("Clear db and embedding")
             time.sleep(20)
+            del self.llama_model
             del self.embeddings
             del self.db
 
