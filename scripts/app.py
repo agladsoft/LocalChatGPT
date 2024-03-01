@@ -79,6 +79,7 @@ class LocalChatGPT:
             del self.db
 
             gc.collect()
+            torch.cuda.ipc_collect()
             torch.cuda.empty_cache()
 
             self.embeddings = HuggingFaceEmbeddings(model_name=EMBEDDER_NAME, cache_folder=MODELS_DIR)
