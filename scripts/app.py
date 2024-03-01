@@ -1,7 +1,9 @@
+import gc
 import re
 import csv
 import time
 import uuid
+import torch
 import uvicorn
 import os.path
 import logging
@@ -77,8 +79,8 @@ class LocalChatGPT:
             del self.embeddings
             del self.db
 
-            self.embeddings.cuda()
-            self.db.cuda()
+            gc.collect()
+            torch.cuda.empty_cache()
 
             self.embeddings = HuggingFaceEmbeddings(model_name=EMBEDDER_NAME, cache_folder=MODELS_DIR)
             self.load_db()
